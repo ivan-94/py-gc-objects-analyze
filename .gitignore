@@ -117,3 +117,5 @@ flamegraph.svg
 
 # Generated benchmark reports
 benches/reports/
+
+analysis

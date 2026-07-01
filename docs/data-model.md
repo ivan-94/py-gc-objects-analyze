@@ -71,12 +71,24 @@ SQLite 不默认内嵌 dump 原文。
 pygco open before.jsonl.gz after.jsonl.gz
 ```
 
+默认 `pygco open` 会把生成的 `analysis.sqlite` 放在用户 cache root 下：
+
+```text
+PYGCO_HOME
+XDG_CACHE_HOME/pygco
+~/.cache/pygco
+```
+
+每个 cache session 包含 `analysis.sqlite`、`import.log` 和 `manifest.json`。这些 SQLite 文件仍是可重建缓存；长期保留原始 dump。
+
 显式路径：
 
 ```bash
 pygco import before.jsonl.gz after.jsonl.gz -o analysis.sqlite --rebuild
 pygco web analysis.sqlite
 ```
+
+显式 `pygco import -o <sqlite>` 不会自动注册为 cache session，路径和生命周期由调用方管理。
 
 如果 `analysis.sqlite` 已存在：
 

@@ -32,7 +32,10 @@ def command_surface(pygco: str) -> tuple[dict[str, set[str]], set[str]]:
     commands = {command: set() for command in parse_commands(root_help)}
     global_flags = parse_long_flags(root_help)
     for command in list(commands):
-        commands[command] = parse_long_flags(help_text(pygco, [command]))
+        command_help = help_text(pygco, [command])
+        commands[command] = parse_long_flags(command_help)
+        for nested in parse_commands(command_help):
+            commands[command] |= parse_long_flags(help_text(pygco, [command, nested]))
     return commands, global_flags
 
 

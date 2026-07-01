@@ -24,8 +24,9 @@ Versioned contracts:
 Included:
 
 - `pygco-dump` Python package with streaming gzip JSONL writer and FastAPI helper.
-- `pygco` Rust CLI for import, summary, objects, object detail, edges, paths, diff, idset, SQL, schema, subgraph export, reports, doctor, web/open, and version.
+- `pygco` Rust CLI for import, cache session listing, summary, objects, object detail, edges, paths, diff, idset, SQL, schema, subgraph export, reports, doctor, web/open, and version.
 - Fresh rebuildable SQLite analysis store with scoped snapshot/object ids.
+- `pygco open` stores default temporary analysis sessions under the user cache root (`PYGCO_HOME`, `XDG_CACHE_HOME/pygco`, or `~/.cache/pygco`) with a `manifest.json` for discovery.
 - Local API server with common response/error envelopes, OpenAPI JSON, async jobs, cancellation, and embedded Web UI static assets.
 - React Web UI for overview, objects, aggregate pages, object detail, graph, diff, findings, SQL/idset, schema, and report workflows.
 - Golden and synthetic fixtures plus import/query/API benchmark scripts.

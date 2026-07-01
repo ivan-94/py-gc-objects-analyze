@@ -16,31 +16,32 @@ Local Python GC object memory forensics
 Usage: pygco [OPTIONS] <COMMAND>
 
 Commands:
-  open             
-  import           
-  summary          
-  objects          
-  object           
-  edges            
-  paths            
-  diff             
-  diff-objects     
-  findings         
-  suspects         
-  idset            
-  sql              
-  schema           
-  export-subgraph  
-  report           
-  doctor           
-  web              
-  api              
-  version          
+  open
+  import
+  sessions
+  summary
+  objects
+  object
+  edges
+  paths
+  diff
+  diff-objects
+  findings
+  suspects
+  idset
+  sql
+  schema
+  export-subgraph
+  report
+  doctor
+  web
+  api
+  version
   help             Print this message or the help of the given subcommand(s)
 
 Options:
-      --no-color  
-      --verbose   
+      --no-color
+      --verbose
   -h, --help      Print help
   -V, --version   Print version
 ```
@@ -51,29 +52,29 @@ Options:
 Usage: pygco open [OPTIONS] <DUMPS>...
 
 Arguments:
-  <DUMPS>...  
+  <DUMPS>...
 
 Options:
       --no-color
-          
+
       --session-dir <SESSION_DIR>
-          
+
       --host <HOST>
           [default: 127.0.0.1]
       --verbose
-          
+
       --port <PORT>
           [default: 0]
       --no-browser
-          
+
       --dev
           Open the React dev server and let it proxy /api to this server
       --dev-server-url <DEV_SERVER_URL>
           [default: http://127.0.0.1:5173/]
       --cleanup-on-exit
-          
+
       --profile
-          
+
   -h, --help
           Print help
 ```
@@ -84,19 +85,19 @@ Options:
 Usage: pygco import [OPTIONS] --output <OUTPUT> <DUMPS>...
 
 Arguments:
-  <DUMPS>...  
+  <DUMPS>...
 
 Options:
       --no-color
-          
+
   -o, --output <OUTPUT>
-          
+
       --rebuild
-          
+
       --verbose
-          
+
       --no-reachability
-          
+
       --reachability-mode <REACHABILITY_MODE>
           [default: full] [possible values: full, off]
       --reachability-depth <REACHABILITY_DEPTH>
@@ -106,15 +107,43 @@ Options:
       --reachability-fanout-limit <REACHABILITY_FANOUT_LIMIT>
           [default: 1000]
       --rules <RULES>
-          
+
       --profile
-          
+
       --format <FORMAT>
           [default: json] [possible values: json, jsonl, table, markdown]
       --fields <FIELDS>
-          
+
   -h, --help
           Print help
+```
+
+## `pygco sessions`
+
+```text
+Usage: pygco sessions [OPTIONS] <COMMAND>
+
+Commands:
+  list
+  help  Print this message or the help of the given subcommand(s)
+
+Options:
+      --no-color
+      --verbose
+  -h, --help      Print help
+```
+
+## `pygco sessions list`
+
+```text
+Usage: pygco sessions list [OPTIONS]
+
+Options:
+      --format <FORMAT>  [default: json] [possible values: json, jsonl, table, markdown]
+      --no-color
+      --fields <FIELDS>
+      --verbose
+  -h, --help             Print help
 ```
 
 ## `pygco summary`
@@ -123,15 +152,15 @@ Options:
 Usage: pygco summary [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color             
-      --snapshot <SNAPSHOT>  
+      --no-color
+      --snapshot <SNAPSHOT>
       --limit <LIMIT>        [default: 20]
-      --verbose              
+      --verbose
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -141,35 +170,35 @@ Options:
 Usage: pygco objects [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
       --no-color
-          
+
       --snapshot <SNAPSHOT>
-          
+
       --q <Q>
-          
+
       --verbose
-          
+
       --type <TYPE_NAME>
-          
+
       --module <MODULE>
-          
+
       --cohort <COHORT>
-          
+
       --min-shallow-size <MIN_SHALLOW_SIZE>
-          
+
       --min-reachable-size <MIN_REACHABLE_SIZE>
-          
+
       --min-in-edges <MIN_IN_EDGES>
-          
+
       --min-out-edges <MIN_OUT_EDGES>
-          
+
       --has-referrers
-          
+
       --missing-referents
-          
+
       --stub <STUB>
           [possible values: true, false]
       --sort <SORT>
@@ -183,7 +212,7 @@ Options:
       --format <FORMAT>
           [default: json] [possible values: json, jsonl, table, markdown]
       --fields <FIELDS>
-          
+
   -h, --help
           Print help
 ```
@@ -194,15 +223,15 @@ Options:
 Usage: pygco object [OPTIONS] --id <ID> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --id <ID>              
-      --no-color             
-      --snapshot <SNAPSHOT>  
-      --verbose              
+      --id <ID>
+      --no-color
+      --snapshot <SNAPSHOT>
+      --verbose
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -212,18 +241,18 @@ Options:
 Usage: pygco edges [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --from <FROM_ID>       
-      --no-color             
-      --to <TO_ID>           
-      --verbose              
-      --snapshot <SNAPSHOT>  
+      --from <FROM_ID>
+      --no-color
+      --to <TO_ID>
+      --verbose
+      --snapshot <SNAPSHOT>
       --limit <LIMIT>        [default: 100]
       --offset <OFFSET>      [default: 0]
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -233,19 +262,19 @@ Options:
 Usage: pygco paths [OPTIONS] --id <ID> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --id <ID>                
-      --no-color               
-      --snapshot <SNAPSHOT>    
-      --verbose                
+      --id <ID>
+      --no-color
+      --snapshot <SNAPSHOT>
+      --verbose
       --direction <DIRECTION>  [default: referrers]
       --depth <DEPTH>          [default: 5]
       --fanout <FANOUT>        [default: 30]
       --limit <LIMIT>          [default: 50]
       --format <FORMAT>        [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>        
+      --fields <FIELDS>
   -h, --help                   Print help
 ```
 
@@ -255,16 +284,16 @@ Options:
 Usage: pygco diff [OPTIONS] --from <FROM_SNAPSHOT> --to <TO_SNAPSHOT> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --from <FROM_SNAPSHOT>  
-      --no-color              
-      --to <TO_SNAPSHOT>      
-      --verbose               
+      --from <FROM_SNAPSHOT>
+      --no-color
+      --to <TO_SNAPSHOT>
+      --verbose
       --limit <LIMIT>         [default: 100]
       --format <FORMAT>       [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>       
+      --fields <FIELDS>
   -h, --help                  Print help
 ```
 
@@ -274,21 +303,21 @@ Options:
 Usage: pygco diff-objects [OPTIONS] --from <FROM_SNAPSHOT> --to <TO_SNAPSHOT> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --from <FROM_SNAPSHOT>  
-      --no-color              
-      --to <TO_SNAPSHOT>      
-      --verbose               
+      --from <FROM_SNAPSHOT>
+      --no-color
+      --to <TO_SNAPSHOT>
+      --verbose
       --state <STATE>         [default: new]
-      --type <TYPE_NAME>      
-      --module <MODULE>       
+      --type <TYPE_NAME>
+      --module <MODULE>
       --limit <LIMIT>         [default: 100]
       --offset <OFFSET>       [default: 0]
-      --ids-only              
+      --ids-only
       --format <FORMAT>       [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>       
+      --fields <FIELDS>
   -h, --help                  Print help
 ```
 
@@ -298,18 +327,18 @@ Options:
 Usage: pygco findings [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color             
-      --snapshot <SNAPSHOT>  
-      --kind <KIND>          
-      --verbose              
-      --severity <SEVERITY>  
+      --no-color
+      --snapshot <SNAPSHOT>
+      --kind <KIND>
+      --verbose
+      --severity <SEVERITY>
       --limit <LIMIT>        [default: 100]
       --offset <OFFSET>      [default: 0]
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -319,20 +348,20 @@ Options:
 Usage: pygco suspects [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color                       
-      --snapshot <SNAPSHOT>            
-      --kind <KINDS>                   
-      --verbose                        
+      --no-color
+      --snapshot <SNAPSHOT>
+      --kind <KINDS>
+      --verbose
       --min-reachable <MIN_REACHABLE>  [default: 1mb]
-      --non-builtin                    
-      --include-stub                   
+      --non-builtin
+      --include-stub
       --limit <LIMIT>                  [default: 20]
       --offset <OFFSET>                [default: 0]
       --format <FORMAT>                [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>                
+      --fields <FIELDS>
   -h, --help                           Print help
 ```
 
@@ -342,20 +371,20 @@ Options:
 Usage: pygco idset [OPTIONS] --left-query <LEFT_QUERY> --right-query <RIGHT_QUERY> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color                   
-      --snapshot <SNAPSHOT>        
-      --left-query <LEFT_QUERY>    
-      --verbose                    
-      --right-query <RIGHT_QUERY>  
+      --no-color
+      --snapshot <SNAPSHOT>
+      --left-query <LEFT_QUERY>
+      --verbose
+      --right-query <RIGHT_QUERY>
       --op <OP>                    [default: intersect]
-      --details                    
+      --details
       --limit <LIMIT>              [default: 1000]
-      --ids-only                   
+      --ids-only
       --format <FORMAT>            [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>            
+      --fields <FIELDS>
   -h, --help                       Print help
 ```
 
@@ -365,16 +394,16 @@ Options:
 Usage: pygco sql [OPTIONS] --query <QUERY> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color         
-  -q, --query <QUERY>    
+      --no-color
+  -q, --query <QUERY>
       --limit <LIMIT>    [default: 1000]
-      --verbose          
-      --explain          
+      --verbose
+      --explain
       --format <FORMAT>  [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>  
+      --fields <FIELDS>
   -h, --help             Print help
 ```
 
@@ -384,15 +413,15 @@ Options:
 Usage: pygco schema [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color             
-      --snapshot <SNAPSHOT>  
+      --no-color
+      --snapshot <SNAPSHOT>
       --limit <LIMIT>        [default: 20]
-      --verbose              
+      --verbose
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -402,20 +431,20 @@ Options:
 Usage: pygco export-subgraph [OPTIONS] --id <ID> <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --id <ID>                      
-      --no-color                     
-      --snapshot <SNAPSHOT>          
-      --verbose                      
+      --id <ID>
+      --no-color
+      --snapshot <SNAPSHOT>
+      --verbose
       --depth <DEPTH>                [default: 2]
       --direction <DIRECTION>        [default: both]
       --node-limit <NODE_LIMIT>      [default: 500]
       --edge-limit <EDGE_LIMIT>      [default: 2000]
       --graph-format <GRAPH_FORMAT>  [default: json] [possible values: json, jsonl, dot]
       --format <FORMAT>              [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>              
+      --fields <FIELDS>
   -h, --help                         Print help
 ```
 
@@ -425,15 +454,15 @@ Options:
 Usage: pygco report [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color             
-      --snapshot <SNAPSHOT>  
+      --no-color
+      --snapshot <SNAPSHOT>
       --limit <LIMIT>        [default: 20]
-      --verbose              
+      --verbose
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -443,15 +472,15 @@ Options:
 Usage: pygco doctor [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
-      --no-color             
-      --snapshot <SNAPSHOT>  
+      --no-color
+      --snapshot <SNAPSHOT>
       --limit <LIMIT>        [default: 20]
-      --verbose              
+      --verbose
       --format <FORMAT>      [default: json] [possible values: json, jsonl, table, markdown]
-      --fields <FIELDS>      
+      --fields <FIELDS>
   -h, --help                 Print help
 ```
 
@@ -461,19 +490,19 @@ Options:
 Usage: pygco web [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
       --host <HOST>
           [default: 127.0.0.1]
       --no-color
-          
+
       --port <PORT>
           [default: 0]
       --verbose
-          
+
       --no-browser
-          
+
       --dev
           Open the React dev server and let it proxy /api to this server
       --dev-server-url <DEV_SERVER_URL>
@@ -488,19 +517,19 @@ Options:
 Usage: pygco api [OPTIONS] <DB>
 
 Arguments:
-  <DB>  
+  <DB>
 
 Options:
       --host <HOST>
           [default: 127.0.0.1]
       --no-color
-          
+
       --port <PORT>
           [default: 0]
       --verbose
-          
+
       --no-browser
-          
+
       --dev
           Open the React dev server and let it proxy /api to this server
       --dev-server-url <DEV_SERVER_URL>
@@ -515,7 +544,7 @@ Options:
 Usage: pygco version [OPTIONS]
 
 Options:
-      --no-color  
-      --verbose   
+      --no-color
+      --verbose
   -h, --help      Print help
 ```

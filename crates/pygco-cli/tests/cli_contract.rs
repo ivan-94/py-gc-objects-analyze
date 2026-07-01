@@ -1,8 +1,10 @@
 use std::{
     fs::{self, File},
-    io::Write,
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::{Command, Output, Stdio},
+    sync::mpsc,
+    time::Duration,
 };
 
 use flate2::{write::GzEncoder, Compression};
@@ -21,6 +23,72 @@ fn fixture(name: &str) -> PathBuf {
 
 fn run(args: &[String]) -> Output {
     Command::new(pygco()).args(args).output().unwrap()
+}
+
+fn run_with_env(args: &[String], envs: &[(&str, &Path)]) -> Output {
+    let mut command = Command::new(pygco());
+    command.args(args);
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().unwrap()
+}
+
+fn run_open_until_database(args: &[String], envs: &[(&str, &Path)]) -> (Vec<String>, PathBuf) {
+    let mut command = Command::new(pygco());
+    command
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    let mut child = command.spawn().unwrap();
+    let stdout = child.stdout.take().unwrap();
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines().map_while(Result::ok) {
+            let _ = tx.send(line);
+        }
+    });
+
+    let mut lines = Vec::new();
+    for _ in 0..100 {
+        match rx.recv_timeout(Duration::from_millis(100)) {
+            Ok(line) => {
+                if let Some(path) = line.strip_prefix("database: ") {
+                    let database = PathBuf::from(path);
+                    lines.push(line);
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return (lines, database);
+                }
+                lines.push(line);
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                if let Some(status) = child.try_wait().unwrap() {
+                    panic!(
+                        "pygco open exited before printing database line: {status:?}\nstdout:\n{}",
+                        lines.join("\n")
+                    );
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                let status = child.wait().unwrap();
+                panic!(
+                    "pygco open closed stdout before printing database line: {status:?}\nstdout:\n{}",
+                    lines.join("\n")
+                );
+            }
+        }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    panic!(
+        "timed out waiting for pygco open database line\nstdout:\n{}",
+        lines.join("\n")
+    );
 }
 
 fn arg(value: impl AsRef<Path>) -> String {
@@ -78,6 +146,160 @@ fn jsonl_stdout(output: Output) -> Vec<Value> {
 fn assert_json_snapshot(actual: Value, snapshot: &str) {
     let expected: Value = serde_json::from_str(snapshot).unwrap();
     assert_eq!(actual, expected);
+}
+
+#[test]
+fn open_creates_default_cache_session_with_manifest() {
+    let cache = tempdir().unwrap();
+    let (_lines, database) = run_open_until_database(
+        &[
+            "open".to_owned(),
+            arg(fixture("tiny-v1.jsonl.gz")),
+            "--no-browser".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    );
+
+    let sessions = cache.path().join("sessions");
+    assert!(
+        database.starts_with(&sessions),
+        "database should be under cache sessions dir, got {}",
+        database.display()
+    );
+    assert_eq!(database.file_name().unwrap(), "analysis.sqlite");
+    assert!(database.is_file());
+
+    let session_dir = database.parent().unwrap();
+    let session_id = session_dir.file_name().unwrap().to_string_lossy();
+    assert!(session_id.contains('T'));
+    assert!(session_dir.join("import.log").is_file());
+
+    let manifest_path = session_dir.join("manifest.json");
+    assert!(manifest_path.is_file());
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
+    assert_eq!(manifest["schema_version"], 1);
+    assert_eq!(manifest["session_id"], session_id.as_ref());
+    assert_eq!(manifest["cache_root"], cache.path().display().to_string());
+    assert_eq!(manifest["database_path"], database.display().to_string());
+    assert_eq!(manifest["snapshots"].as_array().unwrap().len(), 1);
+    assert_eq!(manifest["snapshots"][0]["object_count"], 4);
+}
+
+#[test]
+fn sessions_list_reports_cached_open_sessions() {
+    let cache = tempdir().unwrap();
+    let (_lines, database) = run_open_until_database(
+        &[
+            "open".to_owned(),
+            arg(fixture("tiny-v1.jsonl.gz")),
+            "--no-browser".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    );
+
+    let listing = json_stdout(run_with_env(
+        &[
+            "sessions".to_owned(),
+            "list".to_owned(),
+            "--format".to_owned(),
+            "json".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    ));
+    assert_eq!(listing["cache_root"], cache.path().display().to_string());
+    let sessions = listing["sessions"].as_array().unwrap();
+    assert_eq!(sessions.len(), 1);
+    let session = &sessions[0];
+    assert_eq!(
+        session["id"],
+        database
+            .parent()
+            .unwrap()
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .as_ref()
+    );
+    assert_eq!(session["status"], "ready");
+    assert_eq!(session["database_path"], database.display().to_string());
+    assert_eq!(session["snapshot_count"], 1);
+    assert!(session["size_bytes"].as_u64().unwrap() > 0);
+    assert!(session["source_dumps"][0]
+        .as_str()
+        .unwrap()
+        .contains("tiny-v1.jsonl.gz"));
+}
+
+#[test]
+fn open_respects_explicit_session_dir() {
+    let base = tempdir().unwrap();
+    let cache = tempdir().unwrap();
+    let session_dir = base.path().join("manual-session");
+    let (_lines, database) = run_open_until_database(
+        &[
+            "open".to_owned(),
+            arg(fixture("tiny-v1.jsonl.gz")),
+            "--session-dir".to_owned(),
+            arg(&session_dir),
+            "--no-browser".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    );
+
+    assert_eq!(database, session_dir.join("analysis.sqlite"));
+    assert!(session_dir.join("import.log").is_file());
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(session_dir.join("manifest.json")).unwrap())
+            .unwrap();
+    assert_eq!(manifest["session_id"], "manual-session");
+    assert!(manifest["cache_root"].is_null());
+}
+
+#[test]
+fn sessions_list_tolerates_empty_and_damaged_cache_sessions() {
+    let cache = tempdir().unwrap();
+    let empty = json_stdout(run_with_env(
+        &[
+            "sessions".to_owned(),
+            "list".to_owned(),
+            "--format".to_owned(),
+            "json".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    ));
+    assert_eq!(empty["sessions"].as_array().unwrap().len(), 0);
+
+    let broken = cache.path().join("sessions").join("broken");
+    fs::create_dir_all(&broken).unwrap();
+    fs::write(broken.join("manifest.json"), "{not json").unwrap();
+    let listing = json_stdout(run_with_env(
+        &[
+            "sessions".to_owned(),
+            "list".to_owned(),
+            "--format".to_owned(),
+            "json".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    ));
+    let sessions = listing["sessions"].as_array().unwrap();
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0]["id"], "broken");
+    assert_eq!(sessions[0]["status"], "invalid-manifest");
+}
+
+#[test]
+fn sessions_list_rejects_relative_cache_root_env() {
+    let output = run_with_env(
+        &["sessions".to_owned(), "list".to_owned()],
+        &[("PYGCO_HOME", Path::new("relative-cache"))],
+    );
+    assert!(!output.status.success());
+    let stderr = text(&output.stderr);
+    assert!(
+        stderr.contains("PYGCO_HOME must be an absolute path"),
+        "stderr should explain the invalid cache root:\n{stderr}"
+    );
 }
 
 fn import_db(fixtures: &[&str]) -> (TempDir, PathBuf) {

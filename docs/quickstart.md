@@ -41,12 +41,13 @@ pygco open before.jsonl.gz after.jsonl.gz
 4. 启动本地 API server。
 5. 打开本地 Web UI。
 
-默认 session 存放在项目目录下：
+默认 session 存放在用户 cache root 下。解析顺序是 `PYGCO_HOME`、`XDG_CACHE_HOME/pygco`、`~/.cache/pygco`：
 
 ```text
-.pygco/sessions/<timestamp>/
+<cache-root>/sessions/<timestamp-random>/
   analysis.sqlite
   import.log
+  manifest.json
 ```
 
 ## 4. 显式导入和 CLI 分析
@@ -77,8 +78,8 @@ pygco web analysis.sqlite
 SQLite 是临时分析产物，用完可以删除：
 
 ```bash
-rm -rf .pygco/sessions/<timestamp>
+pygco sessions list --format table
+rm -rf ~/.cache/pygco/sessions/<session-id>
 ```
 
 保留原始 dump 即可复现导入结果。
-

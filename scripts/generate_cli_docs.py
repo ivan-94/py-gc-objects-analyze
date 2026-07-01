@@ -8,6 +8,8 @@ COMMANDS = [
     [],
     ["open"],
     ["import"],
+    ["sessions"],
+    ["sessions", "list"],
     ["summary"],
     ["objects"],
     ["object"],
@@ -61,7 +63,7 @@ def help_text(pygco: str, command: list[str]) -> str:
         text=True,
         capture_output=True,
     )
-    return result.stdout.strip()
+    return "\n".join(line.rstrip() for line in result.stdout.strip().splitlines())
 
 
 if __name__ == "__main__":

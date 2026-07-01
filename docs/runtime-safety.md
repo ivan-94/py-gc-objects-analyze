@@ -65,15 +65,20 @@ producer 不做：
 `pygco open` 创建 session：
 
 ```text
-.pygco/sessions/<timestamp>/
+<cache-root>/sessions/<timestamp-random>/
+  analysis.sqlite
+  import.log
+  manifest.json
 ```
 
 要求：
 
+- 默认 cache root 解析顺序是 `PYGCO_HOME`、`XDG_CACHE_HOME/pygco`、`~/.cache/pygco`。
+- 显式 `--session-dir <path>` 使用用户提供的目录。
 - 导入中的 SQLite 使用 `.tmp.sqlite`。
 - 成功后 rename。
 - 失败后清理半成品。
-- 用户可以手动删除 session。
+- 用户可以通过 `pygco sessions list` 发现缓存 session，并手动删除对应 session 目录。
 
 ## 错误处理
 

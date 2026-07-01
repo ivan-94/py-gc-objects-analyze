@@ -10,6 +10,7 @@ import { Page, PageTitle } from "@/components/shared/page";
 import { apiClient, type ModuleRow, type StatRow } from "@/generated/api-client";
 import { formatBytes, formatNumber } from "@/lib/format";
 import type { UpdateSearch } from "@/lib/search";
+import { OverviewInsights } from "@/pages/overview/OverviewInsights";
 
 export function OverviewPage({ snapshotId, updateSearch }: { snapshotId?: number; updateSearch: UpdateSearch }) {
   const summary = useQuery({
@@ -18,8 +19,13 @@ export function OverviewPage({ snapshotId, updateSearch }: { snapshotId?: number
     enabled: Boolean(snapshotId)
   });
   const types = useQuery({
-    queryKey: ["overview-types", snapshotId],
-    queryFn: () => apiClient.types({ snapshot_id: snapshotId, limit: 100 }),
+    queryKey: ["overview-types", snapshotId, "reachable-size"],
+    queryFn: () => apiClient.types({ snapshot_id: snapshotId, limit: 100, sort: "reachable-size" }),
+    enabled: Boolean(snapshotId)
+  });
+  const cohorts = useQuery({
+    queryKey: ["overview-cohorts", snapshotId, "reachable-size"],
+    queryFn: () => apiClient.cohorts({ snapshot_id: snapshotId, limit: 20, sort: "reachable-size" }),
     enabled: Boolean(snapshotId)
   });
 
@@ -42,6 +48,21 @@ export function OverviewPage({ snapshotId, updateSearch }: { snapshotId?: number
       { page: "objects", q: undefined, type: undefined, module: row.module, cohort: undefined, selected: undefined, offset: undefined },
       { history: "push" }
     );
+  const viewCohort = (cohort: string) =>
+    updateSearch(
+      { page: "objects", q: undefined, type: undefined, module: undefined, cohort, selected: undefined, offset: undefined },
+      { history: "push" }
+    );
+  const openCohorts = () =>
+    updateSearch(
+      { page: "cohorts", q: undefined, type: undefined, module: undefined, cohort: undefined, selected: undefined, offset: undefined, sort: "reachable-size" },
+      { history: "push" }
+    );
+  const openFindings = () =>
+    updateSearch(
+      { page: "findings", q: undefined, type: undefined, module: undefined, cohort: undefined, selected: undefined, offset: undefined },
+      { history: "push" }
+    );
 
   return (
     <Page>
@@ -55,6 +76,17 @@ export function OverviewPage({ snapshotId, updateSearch }: { snapshotId?: number
           value={`${formatNumber(data.missing_stub_summary.missing_referent_count)} / ${formatNumber(data.missing_stub_summary.stub_count)}`}
         />
       </div>
+      <OverviewInsights
+        summary={data}
+        types={types.data ?? []}
+        cohorts={cohorts.data ?? []}
+        typesLoading={types.isLoading}
+        cohortsLoading={cohorts.isLoading}
+        onViewType={viewType}
+        onViewCohort={viewCohort}
+        onOpenCohorts={openCohorts}
+        onOpenFindings={openFindings}
+      />
       <div className="grid gap-3 xl:grid-cols-2">
         <TypeStatTable title="Top Types By Shallow Size" rows={data.top_types_by_shallow_size} onTypeClick={viewType} />
         <TypeStatTable title="Top Estimated Reachable Types" rows={data.top_reachable_types} reachable onTypeClick={viewType} />

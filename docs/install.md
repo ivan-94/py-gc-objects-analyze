@@ -56,7 +56,7 @@ python -m pip install "pygco-dump[fastapi]"
 ./target/release/pygco open fixtures/golden/tiny-v1.jsonl.gz --no-browser
 ```
 
-Then open the printed local URL. By default `pygco open` keeps `.pygco/sessions/<timestamp>/` after exit so the generated `analysis.sqlite` and `import.log` remain inspectable.
+Then open the printed local URL. By default `pygco open` keeps the generated `analysis.sqlite`, `import.log`, and `manifest.json` under the user cache root: `PYGCO_HOME`, `XDG_CACHE_HOME/pygco`, or `~/.cache/pygco`.
 
 ## Development Web Flow
 

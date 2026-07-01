@@ -41,6 +41,7 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 | --- | --- |
 | `open` | 导入 dump，启动本地服务，并可自动打开浏览器 |
 | `import` | 把一个或多个 dump 导入 SQLite |
+| `sessions` | 查看 `pygco open` 创建的缓存分析 session |
 | `summary` | 查看 snapshot 概览、top type/module/cohort、warning/finding |
 | `objects` | 查询对象列表，支持过滤、排序、分页 |
 | `object` | 查看单个对象的详情、直接 referents/referrers |
@@ -135,11 +136,36 @@ pygco open before.jsonl.gz after.jsonl.gz --profile
 
 语义：
 
-- 不指定 `--session-dir` 时，`open` 会创建临时 session 目录保存 SQLite。
+- 不指定 `--session-dir` 时，`open` 会在用户 cache root 下创建 session 目录保存 SQLite。
+- cache root 解析顺序是 `PYGCO_HOME`、`XDG_CACHE_HOME/pygco`、`~/.cache/pygco`。
+- 默认 session 目录形如 `<cache-root>/sessions/<timestamp-random>/`，包含 `analysis.sqlite`、`import.log` 和 `manifest.json`。
+- `--session-dir <path>` 会使用用户给定目录，适合需要项目本地 session 的场景。
 - `--port 0` 表示自动选择空闲端口。
 - `--profile` 会把 import 阶段耗时放入 JSON 输出。
 - `--dev` 面向前端开发：Rust server 提供 API，React dev server 提供 UI。
 - `--cleanup-on-exit` 会在进程退出时清理 session；不传时保留，方便回看 SQLite 和日志。
+
+## `pygco sessions`
+
+查看由默认 `pygco open` 流程创建的缓存分析 session。显式 `pygco import -o <sqlite>` 产物不自动注册为 session。
+
+```bash
+pygco sessions list --format table
+```
+
+JSON 输出：
+
+```bash
+pygco sessions list --format json
+```
+
+语义：
+
+- 扫描 `<cache-root>/sessions/*`。
+- 输出 `id`、`created_at`、`size_bytes`、`database_path`、`snapshot_count`、`source_dumps` 和 `status`。
+- cache root 解析顺序与 `pygco open` 相同：`PYGCO_HOME`、`XDG_CACHE_HOME/pygco`、`~/.cache/pygco`。
+- 如果 cache root 或 `sessions/` 不存在，返回空列表。
+- 损坏或不完整的 session 不会让整个命令失败；对应行会显示 `missing-db`、`missing-manifest` 或 `invalid-manifest`。
 
 ## `pygco import`
 

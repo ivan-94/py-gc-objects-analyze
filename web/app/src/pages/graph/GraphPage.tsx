@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import cytoscape, { type Core, type ElementDefinition, type LayoutOptions, type StylesheetJson } from "cytoscape";
 import fcose from "cytoscape-fcose";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, PanelRightClose, PanelRightOpen, RefreshCw } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,15 @@ type GraphSettings = {
   linkWidth: number;
   showArrows: boolean;
   animate: boolean;
+  hiddenLegendKeys: string[];
+  controlsCollapsed: boolean;
 };
 
+type GraphRenderSettings = Omit<GraphSettings, "hiddenLegendKeys" | "controlsCollapsed">;
 type GraphEdge = { from_id: string; to_id: string };
+type LegendItem = { key: string; label: string; color?: string; ringColor?: string; count?: number; kind: "node" | "edge"; toggleable?: boolean };
+type NodeSemanticKey = "root" | "object" | "stub" | "missing" | "container" | "callable" | "class" | "data" | "module";
+type NodeSemantic = { key: NodeSemanticKey; label: string; color: string; ringColor: string; rank: number };
 
 const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
   layoutMode: "force",
@@ -51,12 +57,27 @@ const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
   gravity: 0.08,
   linkWidth: 0.62,
   showArrows: false,
-  animate: true
+  animate: true,
+  hiddenLegendKeys: [],
+  controlsCollapsed: false
 };
 
 const GRAPH_SETTINGS_STORAGE_KEY = "pygco.graph.settings.v1";
 
-const GRAPH_COLORS = ["#8b5cf6", "#14b8a6", "#f97316", "#06b6d4", "#84cc16", "#e879f9", "#f43f5e", "#eab308"];
+const NODE_SEMANTICS: Record<NodeSemanticKey, NodeSemantic> = {
+  root: { key: "root", label: "root", color: "#a78bfa", ringColor: "rgb(196 181 253 / 0.7)", rank: 0 },
+  object: { key: "object", label: "object", color: "#94a3b8", ringColor: "rgb(148 163 184 / 0.5)", rank: 1 },
+  container: { key: "container", label: "container", color: "#38bdf8", ringColor: "rgb(125 211 252 / 0.55)", rank: 2 },
+  callable: { key: "callable", label: "callable/code", color: "#2dd4bf", ringColor: "rgb(94 234 212 / 0.55)", rank: 3 },
+  class: { key: "class", label: "class/type", color: "#e879f9", ringColor: "rgb(240 171 252 / 0.55)", rank: 4 },
+  data: { key: "data", label: "data/scalar", color: "#84cc16", ringColor: "rgb(163 230 53 / 0.55)", rank: 5 },
+  module: { key: "module", label: "module/package", color: "#fb923c", ringColor: "rgb(253 186 116 / 0.55)", rank: 6 },
+  stub: { key: "stub", label: "stub", color: "#fbbf24", ringColor: "rgb(252 211 77 / 0.6)", rank: 7 },
+  missing: { key: "missing", label: "missing", color: "#fb7185", ringColor: "rgb(248 113 113 / 0.6)", rank: 8 }
+};
+
+const CONTAINER_TYPES = new Set(["dict", "list", "tuple", "set", "frozenset", "deque", "defaultdict", "ordereddict", "weakset", "weakkeydictionary", "weakvaluedictionary", "mappingproxy", "chainmap"]);
+const DATA_TYPES = new Set(["str", "int", "float", "bool", "bytes", "bytearray", "nonetype", "ellipsis", "slice", "range", "complex"]);
 
 const cytoscapeGlobal = globalThis as typeof globalThis & { __pygcoFcoseRegistered?: boolean };
 if (!cytoscapeGlobal.__pygcoFcoseRegistered) {
@@ -74,12 +95,41 @@ export function GraphPage({ snapshotId, root, depth, nodeLimit, direction, updat
     enabled: Boolean(snapshotId && root)
   });
   const graphNodes = useMemo(() => withMissingNodes(graph.data?.nodes ?? [], graph.data?.missing_edges ?? []), [graph.data?.nodes, graph.data?.missing_edges]);
+  const hiddenLegendKeys = useMemo(() => new Set(settings.hiddenLegendKeys), [settings.hiddenLegendKeys]);
+  const renderSettings = useMemo<GraphRenderSettings>(
+    () => ({
+      layoutMode: settings.layoutMode,
+      labelMode: settings.labelMode,
+      nodeScale: settings.nodeScale,
+      linkDistance: settings.linkDistance,
+      repel: settings.repel,
+      gravity: settings.gravity,
+      linkWidth: settings.linkWidth,
+      showArrows: settings.showArrows,
+      animate: settings.animate
+    }),
+    [settings.animate, settings.gravity, settings.labelMode, settings.layoutMode, settings.linkDistance, settings.linkWidth, settings.nodeScale, settings.repel, settings.showArrows]
+  );
+  const visibleGraph = useMemo(
+    () => filterGraphData(graphNodes, graph.data?.edges ?? [], graph.data?.missing_edges ?? [], root, hiddenLegendKeys),
+    [graph.data?.edges, graph.data?.missing_edges, graphNodes, hiddenLegendKeys, root]
+  );
   const selectedNode = graphNodes.find((node) => node.object_id === selectedNodeId) ?? graphNodes.find((node) => node.object_id === root);
-  const totalEdges = (graph.data?.edges.length ?? 0) + (graph.data?.missing_edges.length ?? 0);
+  const totalEdges = visibleGraph.edges.length + visibleGraph.missingEdges.length;
 
   useEffect(() => {
     saveGraphSettings(settings);
   }, [settings]);
+
+  const toggleLegendKey = (key: string) => {
+    if (key === "root") return;
+    setSettings((current) => {
+      const hidden = new Set(current.hiddenLegendKeys);
+      if (hidden.has(key)) hidden.delete(key);
+      else hidden.add(key);
+      return { ...current, hiddenLegendKeys: [...hidden].sort() };
+    });
+  };
 
   return (
     <Page className="gap-3">
@@ -90,17 +140,17 @@ export function GraphPage({ snapshotId, root, depth, nodeLimit, direction, updat
       />
       <div className="relative min-h-[720px] overflow-hidden rounded-lg border border-slate-800 bg-[#111318] shadow-sm">
         <GraphCanvas
-          nodes={graphNodes}
-          edges={graph.data?.edges ?? []}
-          missingEdges={graph.data?.missing_edges ?? []}
+          nodes={visibleGraph.nodes}
+          edges={visibleGraph.edges}
+          missingEdges={visibleGraph.missingEdges}
           root={root}
           selectedNodeId={selectedNode?.object_id}
-          settings={settings}
+          settings={renderSettings}
           layoutNonce={layoutNonce}
           onSelect={setSelectedNodeId}
         />
         <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex flex-col items-start gap-3 xl:inset-x-4 xl:top-4 xl:flex-row xl:justify-between xl:gap-4">
-          <GraphStatus nodeCount={graphNodes.length} edgeCount={totalEdges} selectedNode={selectedNode} />
+          <GraphStatus nodeCount={visibleGraph.nodes.length} edgeCount={totalEdges} selectedNode={selectedNode} />
           <GraphControls
             root={root}
             depth={depth}
@@ -113,7 +163,11 @@ export function GraphPage({ snapshotId, root, depth, nodeLimit, direction, updat
             updateSearch={updateSearch}
           />
         </div>
-        <GraphLegend />
+        <GraphLegend
+          items={graphLegendItems(graphNodes, graph.data?.edges.length ?? 0, graph.data?.missing_edges.length ?? 0, root)}
+          hiddenKeys={hiddenLegendKeys}
+          onToggle={toggleLegendKey}
+        />
         {selectedNode ? <GraphNodeCard root={root} selectedNode={selectedNode} updateSearch={updateSearch} /> : null}
       </div>
       {graph.error ? <ErrorState error={graph.error} /> : null}
@@ -136,7 +190,7 @@ function GraphCanvas({
   missingEdges: GraphEdge[];
   root: string;
   selectedNodeId?: string;
-  settings: GraphSettings;
+  settings: GraphRenderSettings;
   layoutNonce: number;
   onSelect: (id: string) => void;
 }) {
@@ -217,15 +271,36 @@ function GraphControls({
   onExport: () => void;
   updateSearch: UpdateSearch;
 }) {
+  const buttonClass = "h-8 w-8 border-white/10 text-slate-200 hover:bg-white/10";
+
+  if (settings.controlsCollapsed) {
+    return (
+      <aside className="pointer-events-auto flex items-center gap-1 rounded-lg border border-white/10 bg-slate-950/88 p-2 text-slate-100 shadow-2xl backdrop-blur">
+        <Button variant="ghost" size="icon" className={buttonClass} title="Expand graph controls" onClick={() => onSettingsChange({ controlsCollapsed: false })}>
+          <PanelRightOpen size={14} />
+        </Button>
+        <Button variant="ghost" size="icon" className={buttonClass} title="Run layout again" onClick={onRelayout}>
+          <RefreshCw size={14} />
+        </Button>
+        <Button variant="ghost" size="icon" className={buttonClass} title="Export graph JSON" onClick={onExport}>
+          <Download size={14} />
+        </Button>
+      </aside>
+    );
+  }
+
   return (
     <aside className="pointer-events-auto max-h-[calc(100vh-220px)] w-full overflow-auto rounded-lg border border-white/10 bg-slate-950/88 p-3 text-slate-100 shadow-2xl backdrop-blur sm:w-[320px]">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Graph controls</div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" className="h-8 w-8 border-white/10 text-slate-200 hover:bg-white/10" title="Run layout again" onClick={onRelayout}>
+          <Button variant="ghost" size="icon" className={buttonClass} title="Collapse graph controls" onClick={() => onSettingsChange({ controlsCollapsed: true })}>
+            <PanelRightClose size={14} />
+          </Button>
+          <Button variant="ghost" size="icon" className={buttonClass} title="Run layout again" onClick={onRelayout}>
             <RefreshCw size={14} />
           </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 border-white/10 text-slate-200 hover:bg-white/10" title="Export graph JSON" onClick={onExport}>
+          <Button variant="ghost" size="icon" className={buttonClass} title="Export graph JSON" onClick={onExport}>
             <Download size={14} />
           </Button>
         </div>
@@ -363,25 +438,45 @@ function ToggleField({ label, checked, onChange }: { label: string; checked: boo
   );
 }
 
-function GraphLegend() {
+function GraphLegend({ items, hiddenKeys, onToggle }: { items: LegendItem[]; hiddenKeys: Set<string>; onToggle: (key: string) => void }) {
   return (
-    <div className="pointer-events-none absolute bottom-4 left-4 z-10 flex max-w-[calc(100%-2rem)] flex-wrap items-center gap-4 rounded-md border border-white/10 bg-slate-950/78 px-3 py-2 text-xs text-slate-300 shadow-xl backdrop-blur">
-      <LegendDot className="bg-violet-400 ring-violet-300/70" label="root" />
-      <LegendDot className="bg-slate-300 ring-slate-400/50" label="object" />
-      <LegendDot className="bg-amber-300 ring-amber-300/60" label="stub" />
-      <LegendDot className="bg-red-300 ring-red-300/60" label="missing" />
-      <span className="h-px w-8 bg-slate-500" />
-      <span>reference</span>
+    <div className="pointer-events-auto absolute bottom-4 left-4 right-4 z-10 flex max-h-40 flex-wrap items-center gap-2 overflow-auto rounded-md border border-white/10 bg-slate-950/78 px-3 py-2 text-xs text-slate-300 shadow-xl backdrop-blur sm:right-[392px]">
+      {items.map((item) => {
+        const hidden = hiddenKeys.has(item.key);
+        return (
+          <LegendButton key={item.key} item={item} hidden={hidden} onToggle={onToggle} />
+        );
+      })}
     </div>
   );
 }
 
-function LegendDot({ className, label }: { className: string; label: string }) {
+function LegendButton({ item, hidden, onToggle }: { item: LegendItem; hidden: boolean; onToggle: (key: string) => void }) {
+  const toggleable = item.toggleable !== false;
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className={cn("h-2.5 w-2.5 rounded-full ring-2", className)} />
-      {label}
-    </span>
+    <button
+      className={cn(
+        "inline-flex max-w-[260px] items-center gap-2 rounded-md border border-white/0 px-1.5 py-1 text-left transition-colors",
+        toggleable && "hover:border-white/10 hover:bg-white/[0.04]",
+        hidden && "opacity-35 saturate-0"
+      )}
+      disabled={!toggleable}
+      title={toggleable ? `${hidden ? "Show" : "Hide"} ${item.label}` : item.label}
+      onDoubleClick={() => {
+        if (toggleable) onToggle(item.key);
+      }}
+    >
+      {item.kind === "edge" ? (
+        <span className="h-px w-8 shrink-0 bg-slate-500" />
+      ) : (
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2"
+          style={{ backgroundColor: item.color, boxShadow: `0 0 0 2px ${item.ringColor ?? "rgb(148 163 184 / 0.5)"}` }}
+        />
+      )}
+      <span className={cn("truncate", hidden && "line-through")}>{item.label}</span>
+      {typeof item.count === "number" ? <span className="shrink-0 font-mono text-[10px] text-slate-500">{formatNumber(item.count)}</span> : null}
+    </button>
   );
 }
 
@@ -425,7 +520,68 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function graphElements(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: GraphEdge[], root: string, settings: GraphSettings): ElementDefinition[] {
+function filterGraphData(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: GraphEdge[], root: string, hiddenKeys: Set<string>) {
+  const visibleNodes = nodes.filter((node) => isNodeVisible(node, root, hiddenKeys));
+  const visibleIds = new Set(visibleNodes.map((node) => node.object_id));
+  const showReferences = !hiddenKeys.has("reference");
+  return {
+    nodes: visibleNodes,
+    edges: showReferences ? edges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)) : [],
+    missingEdges: showReferences ? missingEdges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)) : []
+  };
+}
+
+function isNodeVisible(node: ObjectRow, root: string, hiddenKeys: Set<string>) {
+  if (node.object_id === root) return true;
+  return !hiddenKeys.has(nodeLegendKey(node, root));
+}
+
+function graphLegendItems(nodes: ObjectRow[], edgeCount: number, missingEdgeCount: number, root: string): LegendItem[] {
+  const groups = new Map<string, LegendItem>();
+  groups.set("root", { ...legendItemForSemantic("root"), count: nodes.some((node) => node.object_id === root) ? 1 : 0, toggleable: false });
+
+  for (const node of nodes) {
+    const key = nodeLegendKey(node, root);
+    if (key === "root") continue;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.count = (existing.count ?? 0) + 1;
+      continue;
+    }
+    groups.set(key, legendItemForNode(key, node));
+  }
+
+  const orderedNodeItems = [...groups.values()].sort((left, right) => {
+    const leftRank = legendRank(left.key);
+    const rightRank = legendRank(right.key);
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return (right.count ?? 0) - (left.count ?? 0) || left.label.localeCompare(right.label);
+  });
+
+  return [
+    ...orderedNodeItems,
+    { key: "reference", label: "reference", count: edgeCount + missingEdgeCount, kind: "edge" }
+  ];
+}
+
+function legendItemForNode(key: string, _node: ObjectRow): LegendItem {
+  return { ...legendItemForSemantic(key as NodeSemanticKey), count: 1 };
+}
+
+function legendItemForSemantic(key: NodeSemanticKey): LegendItem {
+  const semantic = NODE_SEMANTICS[key];
+  return { key, label: semantic.label, color: semantic.color, ringColor: semantic.ringColor, kind: "node" };
+}
+
+function nodeLegendKey(node: ObjectRow, root: string) {
+  return nodeSemantic(node, root).key;
+}
+
+function legendRank(key: string) {
+  return NODE_SEMANTICS[key as NodeSemanticKey]?.rank ?? 99;
+}
+
+function graphElements(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: GraphEdge[], root: string, settings: GraphRenderSettings): ElementDefinition[] {
   const depthById = graphDepths(root, edges, missingEdges);
   const maxLogSize = Math.max(1, ...nodes.map((node) => Math.log10(node.estimated_reachable_size + 1)));
   const importantIds = importantNodeIds(nodes, root);
@@ -433,6 +589,7 @@ function graphElements(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: Gra
     ...nodes.map((node) => {
       const isRoot = node.object_id === root;
       const isMissing = node.type === "<missing>";
+      const semantic = nodeSemantic(node, root);
       const visibleLabel = labelForMode(node, root, importantIds, settings.labelMode);
       const sizeScore = Math.log10(node.estimated_reachable_size + 1) / maxLogSize;
       const nodeSize = Math.round((7 + Math.sqrt(sizeScore) * 18 + (isRoot ? 8 : 0)) * settings.nodeScale);
@@ -443,8 +600,8 @@ function graphElements(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: Gra
           visibleLabel,
           nodeSize,
           depth: depthById.get(node.object_id) ?? 999,
-          color: isRoot ? "#a78bfa" : nodeColor(node),
-          borderColor: isRoot ? "#ddd6fe" : isMissing ? "#fca5a5" : node.stub ? "#fbbf24" : "#cbd5e1"
+          color: semantic.color,
+          borderColor: isRoot ? "#ddd6fe" : isMissing ? "#fca5a5" : node.stub ? "#fbbf24" : semantic.color
         },
         classes: [isRoot ? "root" : "", node.stub ? "stub" : "", isMissing ? "missing" : ""].filter(Boolean).join(" ")
       };
@@ -454,7 +611,7 @@ function graphElements(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: Gra
   ];
 }
 
-function graphStyles(settings: GraphSettings): StylesheetJson {
+function graphStyles(settings: GraphRenderSettings): StylesheetJson {
   return [
     {
       selector: "node",
@@ -477,8 +634,8 @@ function graphStyles(settings: GraphSettings): StylesheetJson {
       }
     },
     { selector: "node.root", style: { "border-width": 3, "border-opacity": 1 } },
-    { selector: "node.stub", style: { "background-color": "#fbbf24", "border-color": "#fde68a" } },
-    { selector: "node.missing", style: { "background-color": "#fecaca", "border-color": "#f87171", "border-style": "dashed" } },
+    { selector: "node.stub", style: { "background-color": NODE_SEMANTICS.stub.color, "border-color": "#fde68a" } },
+    { selector: "node.missing", style: { "background-color": NODE_SEMANTICS.missing.color, "border-color": "#fecaca", "border-style": "dashed" } },
     { selector: "node:selected", style: { label: "data(label)", "border-color": "#f8fafc", "border-width": 4, "z-index": 30 } },
     { selector: "node.hover", style: { label: "data(label)", "border-color": "#f8fafc", "border-width": 3, "z-index": 25 } },
     {
@@ -497,7 +654,7 @@ function graphStyles(settings: GraphSettings): StylesheetJson {
   ];
 }
 
-function runLayout(cy: Core, root: string, settings: GraphSettings) {
+function runLayout(cy: Core, root: string, settings: GraphRenderSettings) {
   if (settings.layoutMode === "radial") {
     cy.layout({
       name: "concentric",
@@ -584,14 +741,29 @@ function labelForMode(node: ObjectRow, root: string, importantIds: Set<string>, 
   return "";
 }
 
-function nodeColor(node: ObjectRow) {
-  if (node.type === "<missing>") return "#fecaca";
-  if (node.stub) return "#fbbf24";
-  if (node.module === "builtins") return "#94a3b8";
-  const key = node.module || node.type;
-  let hash = 0;
-  for (let index = 0; index < key.length; index += 1) hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
-  return GRAPH_COLORS[hash % GRAPH_COLORS.length];
+function nodeSemantic(node: ObjectRow, root: string): NodeSemantic {
+  if (node.object_id === root) return NODE_SEMANTICS.root;
+  if (node.type === "<missing>") return NODE_SEMANTICS.missing;
+  if (node.stub) return NODE_SEMANTICS.stub;
+
+  const type = node.type.toLowerCase();
+  const shortType = type.split(".").at(-1) ?? type;
+  if (DATA_TYPES.has(shortType)) return NODE_SEMANTICS.data;
+  if (CONTAINER_TYPES.has(shortType)) return NODE_SEMANTICS.container;
+  if (isCallableType(type)) return NODE_SEMANTICS.callable;
+  if (isClassType(type)) return NODE_SEMANTICS.class;
+  if (shortType === "module") return NODE_SEMANTICS.module;
+  return NODE_SEMANTICS.object;
+}
+
+function isCallableType(type: string) {
+  return type === "code" || type === "cell" || type.includes("function") || type.includes("method") || type.includes("descriptor") || type.includes("property") || type.includes("callable") || type.endsWith("partial");
+}
+
+function isClassType(type: string) {
+  if (type === "type" || type === "abc.abcmeta") return true;
+  if (type === "nonetype") return false;
+  return type.includes("metaclass") || type.endsWith("type");
 }
 
 function withMissingNodes(nodes: ObjectRow[], missingEdges: GraphEdge[]): ObjectRow[] {
@@ -658,7 +830,9 @@ function normalizeGraphSettings(value: Record<string, unknown>): GraphSettings {
     gravity: numberInRange(value.gravity, 0.03, 0.8, DEFAULT_GRAPH_SETTINGS.gravity),
     linkWidth: numberInRange(value.linkWidth, 0.35, 2.2, DEFAULT_GRAPH_SETTINGS.linkWidth),
     showArrows: typeof value.showArrows === "boolean" ? value.showArrows : DEFAULT_GRAPH_SETTINGS.showArrows,
-    animate: typeof value.animate === "boolean" ? value.animate : DEFAULT_GRAPH_SETTINGS.animate
+    animate: typeof value.animate === "boolean" ? value.animate : DEFAULT_GRAPH_SETTINGS.animate,
+    hiddenLegendKeys: stringArray(value.hiddenLegendKeys),
+    controlsCollapsed: typeof value.controlsCollapsed === "boolean" ? value.controlsCollapsed : DEFAULT_GRAPH_SETTINGS.controlsCollapsed
   };
 }
 
@@ -669,4 +843,13 @@ function numberInRange(value: unknown, min: number, max: number, fallback: numbe
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringArray(value: unknown) {
+  if (!Array.isArray(value)) return DEFAULT_GRAPH_SETTINGS.hiddenLegendKeys;
+  return value.filter((item): item is string => typeof item === "string" && isLegendFilterKey(item));
+}
+
+function isLegendFilterKey(value: string) {
+  return value === "reference" || value in NODE_SEMANTICS;
 }

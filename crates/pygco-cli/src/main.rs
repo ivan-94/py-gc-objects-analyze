@@ -5,7 +5,6 @@ use std::{
 };
 
 use anyhow::{anyhow, Context};
-use chrono::Utc;
 use clap::{Args, ColorChoice, CommandFactory, FromArgMatches, Parser, Subcommand, ValueEnum};
 use serde_json::{Map, Value};
 
@@ -13,6 +12,8 @@ use pygco_analysis::{
     DiffObjectsOptions, FindingsOptions, ObjectFilters, ReachabilityParams, SuspectsOptions,
 };
 use pygco_importer::{import_dumps, ImportError, ImportOptions, ReachabilityMode};
+
+mod cache_sessions;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -33,6 +34,7 @@ struct Cli {
 enum Command {
     Open(OpenArgs),
     Import(ImportArgs),
+    Sessions(SessionsArgs),
     Summary(DbArgs),
     Objects(ObjectsArgs),
     Object(ObjectArgs),
@@ -93,6 +95,23 @@ struct ImportArgs {
     profile: bool,
     #[command(flatten)]
     output_args: OutputArgs,
+}
+
+#[derive(Debug, Args)]
+struct SessionsArgs {
+    #[command(subcommand)]
+    command: SessionsCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum SessionsCommand {
+    List(SessionsListArgs),
+}
+
+#[derive(Debug, Args)]
+struct SessionsListArgs {
+    #[command(flatten)]
+    output: OutputArgs,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -460,6 +479,7 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Open(args) => cmd_open(args).await,
         Command::Import(args) => cmd_import(args),
+        Command::Sessions(args) => cmd_sessions(args),
         Command::Summary(args) => with_conn(&args.db, |conn| {
             emit(
                 pygco_analysis::summary(conn, args.snapshot, args.limit)?,
@@ -526,6 +546,24 @@ async fn run(cli: Cli) -> anyhow::Result<()> {
     }
 }
 
+fn cmd_sessions(args: SessionsArgs) -> anyhow::Result<()> {
+    match args.command {
+        SessionsCommand::List(args) => {
+            let value = cache_sessions::list_sessions()?;
+            match args.output.format {
+                OutputFormat::Json => emit(value, args.output),
+                OutputFormat::Jsonl | OutputFormat::Table | OutputFormat::Markdown => {
+                    let rows = value
+                        .get("sessions")
+                        .cloned()
+                        .unwrap_or_else(|| Value::Array(Vec::new()));
+                    emit(rows, args.output)
+                }
+            }
+        }
+    }
+}
+
 fn cmd_import(args: ImportArgs) -> anyhow::Result<()> {
     let options = ImportOptions {
         rebuild: args.rebuild,
@@ -550,25 +588,28 @@ fn cmd_import(args: ImportArgs) -> anyhow::Result<()> {
 }
 
 async fn cmd_open(args: OpenArgs) -> anyhow::Result<()> {
-    let session_root = args.session_dir.unwrap_or_else(|| {
-        let timestamp = Utc::now().format("%Y%m%dT%H%M%SZ").to_string();
-        PathBuf::from(".pygco").join("sessions").join(timestamp)
-    });
-    fs::create_dir_all(&session_root)?;
-    let db = session_root.join("analysis.sqlite");
-    let import_log = session_root.join("import.log");
+    let session = match args.session_dir {
+        Some(session_dir) => cache_sessions::SessionPaths::explicit(session_dir),
+        None => cache_sessions::SessionPaths::new_default()?,
+    };
+    fs::create_dir_all(&session.session_dir)?;
+    let options = ImportOptions {
+        rebuild: true,
+        profile: args.profile,
+        ..ImportOptions::default()
+    };
     let summary = import_dumps(
-        args.dumps,
-        db.clone(),
-        ImportOptions {
-            rebuild: true,
-            profile: args.profile,
-            ..ImportOptions::default()
-        },
+        args.dumps.clone(),
+        session.database_path.clone(),
+        options.clone(),
     )?;
-    fs::write(&import_log, serde_json::to_string_pretty(&summary)?)?;
+    fs::write(
+        &session.import_log_path,
+        serde_json::to_string_pretty(&summary)?,
+    )?;
+    cache_sessions::write_manifest(&session, &args.dumps, &summary, &options)?;
     let result = serve_web(WebArgs {
-        db: db.clone(),
+        db: session.database_path.clone(),
         host: args.host,
         port: args.port,
         no_browser: args.no_browser,
@@ -577,7 +618,7 @@ async fn cmd_open(args: OpenArgs) -> anyhow::Result<()> {
     })
     .await;
     if args.cleanup_on_exit {
-        let _ = fs::remove_dir_all(&session_root);
+        let _ = fs::remove_dir_all(&session.session_dir);
     }
     result
 }
