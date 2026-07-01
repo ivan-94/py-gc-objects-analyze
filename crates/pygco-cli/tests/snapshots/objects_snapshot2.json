@@ -1,0 +1,37 @@
+{
+  "limit": 2,
+  "offset": 0,
+  "rows": [
+    {
+      "estimated_reachable_count": 3,
+      "estimated_reachable_size": 432,
+      "gc_tracked": 1,
+      "in_edges": 0,
+      "missing_referents": 0,
+      "module": "builtins",
+      "object_id": "100",
+      "out_edges": 2,
+      "qualname": "dict",
+      "reachable_truncated": 0,
+      "shallow_size": 280,
+      "stub": 0,
+      "type": "dict"
+    },
+    {
+      "estimated_reachable_count": 1,
+      "estimated_reachable_size": 80,
+      "gc_tracked": 1,
+      "in_edges": 1,
+      "missing_referents": 0,
+      "module": "app",
+      "object_id": "101",
+      "out_edges": 0,
+      "qualname": "Widget",
+      "reachable_truncated": 0,
+      "shallow_size": 80,
+      "stub": 0,
+      "type": "app.Widget"
+    }
+  ],
+  "total": 3
+}

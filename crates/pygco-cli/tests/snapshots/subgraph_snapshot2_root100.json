@@ -1,0 +1,54 @@
+{
+  "edges": [
+    {
+      "from_id": "100",
+      "to_id": "101"
+    },
+    {
+      "from_id": "100",
+      "to_id": "102"
+    },
+    {
+      "from_id": "100",
+      "to_id": "101"
+    },
+    {
+      "from_id": "100",
+      "to_id": "102"
+    }
+  ],
+  "limits": {
+    "depth": 2,
+    "edge_limit": 2000,
+    "node_limit": 500
+  },
+  "missing_edges": [],
+  "nodes": [
+    {
+      "module": "builtins",
+      "object_id": "100",
+      "qualname": "dict",
+      "shallow_size": 280,
+      "stub": 0,
+      "type": "dict"
+    },
+    {
+      "module": "app",
+      "object_id": "101",
+      "qualname": "Widget",
+      "shallow_size": 80,
+      "stub": 0,
+      "type": "app.Widget"
+    },
+    {
+      "module": "redis",
+      "object_id": "102",
+      "qualname": "ConnectionPool",
+      "shallow_size": 72,
+      "stub": 0,
+      "type": "redis.ConnectionPool"
+    }
+  ],
+  "root_object_id": "100",
+  "truncated": false
+}

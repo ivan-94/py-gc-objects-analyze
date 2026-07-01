@@ -1,0 +1,10 @@
+[package]
+name = "pygco-report"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+serde_json.workspace = true
+pygco-analysis = { path = "../pygco-analysis" }

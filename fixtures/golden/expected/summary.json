@@ -1,0 +1,11 @@
+{
+  "tiny": {
+    "object_count": 4,
+    "edge_count": 5,
+    "stub_count": 0,
+    "missing_referent_count": 0,
+    "shallow_size_sum": 600,
+    "top_type_by_count": "app.Widget",
+    "top_type_by_shallow_size": "dict"
+  }
+}

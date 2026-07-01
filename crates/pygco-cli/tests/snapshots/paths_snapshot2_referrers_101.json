@@ -1,0 +1,12 @@
+{
+  "depth": 5,
+  "direction": "referrers",
+  "fanout_limit": 30,
+  "object_id": "101",
+  "paths": [
+    [
+      "101",
+      "100"
+    ]
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "summary_delta": {
+    "object_count": 1,
+    "edge_count": 1,
+    "shallow_size_sum": 112
+  },
+  "confidence": "high",
+  "new_object_ids": [
+    "102"
+  ],
+  "changed_object_ids": [
+    "101"
+  ]
+}

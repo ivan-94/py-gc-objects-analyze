@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pygco-dump"
+version = "0.1.0"
+description = "Low-impact Python GC object dump producer for pygco"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.115.0"]
+test = ["pytest>=8.0.0", "fastapi>=0.115.0", "httpx>=0.27.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,36 @@
+{
+  "tiny": {
+    "1": {
+      "reachable_count": 4,
+      "reachable_size": 600,
+      "truncated": 0
+    },
+    "2": {
+      "reachable_count": 2,
+      "reachable_size": 160,
+      "truncated": 0
+    },
+    "3": {
+      "reachable_count": 1,
+      "reachable_size": 40,
+      "truncated": 0
+    },
+    "4": {
+      "reachable_count": 2,
+      "reachable_size": 200,
+      "truncated": 0
+    }
+  },
+  "cycles": {
+    "30": {
+      "reachable_count": 2,
+      "reachable_size": 100,
+      "truncated": 0
+    },
+    "31": {
+      "reachable_count": 2,
+      "reachable_size": 100,
+      "truncated": 0
+    }
+  }
+}

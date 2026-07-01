@@ -1,0 +1,21 @@
+{
+  "tiny_object_ids": [
+    "1",
+    "2",
+    "3",
+    "4"
+  ],
+  "stubs": [
+    {
+      "object_id": "11",
+      "type": "int",
+      "stub": 1
+    }
+  ],
+  "missing_edges": [
+    {
+      "from_id": "20",
+      "to_id": "999"
+    }
+  ]
+}

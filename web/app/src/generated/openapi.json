@@ -1,0 +1,619 @@
+{
+  "components": {
+    "schemas": {
+      "AggregateDelta": {
+        "x-typescript": "export type AggregateDelta = {\n  count_delta: number;\n  shallow_size_delta: number;\n  type?: string;\n  module?: string;\n  cohort?: string;\n};"
+      },
+      "AggregateParams": {
+        "x-typescript": "export type AggregateParams = {\n  snapshot_id?: number;\n  limit?: number;\n  sort?: \"count\" | \"shallow-size\" | \"reachable-size\";\n};"
+      },
+      "CohortRow": {
+        "x-typescript": "export type CohortRow = {\n  cohort: string;\n  count: number;\n  shallow_size_sum: number;\n  estimated_reachable_size_sum?: number;\n  estimated_reachable_size_max?: number;\n  reachable_truncated_count?: number;\n  type_count: number;\n  details?: { types?: { type: string; module: string; count: number; shallow_size_sum: number }[] };\n  rules_version: string;\n};"
+      },
+      "DiffObjectRow": {
+        "x-typescript": "export type DiffObjectRow = {\n  object_id: string;\n  type: string;\n  module: string;\n  from_shallow_size: number | null;\n  to_shallow_size: number | null;\n  shallow_size_delta: number;\n  state: string;\n};"
+      },
+      "DiffObjectsParams": {
+        "x-typescript": "export type DiffObjectsParams = {\n  from_snapshot_id: number;\n  to_snapshot_id: number;\n  state?: string;\n  type?: string;\n  module?: string;\n  limit?: number;\n  offset?: number;\n};"
+      },
+      "DiffObjectsResponse": {
+        "x-typescript": "export type DiffObjectsResponse = {\n  rows: DiffObjectRow[];\n  total: number;\n};"
+      },
+      "DiffParams": {
+        "x-typescript": "export type DiffParams = {\n  from_snapshot_id: number;\n  to_snapshot_id: number;\n  limit?: number;\n};"
+      },
+      "DiffSummary": {
+        "x-typescript": "export type DiffSummary = {\n  confidence: { level: string; message: string };\n  summary_delta: Record<string, number>;\n  object_lifecycle: { new_count: number; gone_count: number; retained_count: number };\n  type_delta?: AggregateDelta[];\n  module_delta?: AggregateDelta[];\n  cohort_delta?: AggregateDelta[];\n};"
+      },
+      "EdgesParams": {
+        "x-typescript": "export type EdgesParams = {\n  snapshot_id?: number;\n  direction?: string;\n  limit?: number;\n  offset?: number;\n};"
+      },
+      "FindingRow": {
+        "x-typescript": "export type FindingRow = {\n  severity: string;\n  kind: string;\n  title: string;\n  message: string;\n  action: string;\n  evidence: unknown;\n};"
+      },
+      "FindingsParams": {
+        "x-typescript": "export type FindingsParams = {\n  snapshot_id?: number;\n  kind?: string;\n  severity?: string;\n  limit?: number;\n  offset?: number;\n};"
+      },
+      "FindingsResponse": {
+        "x-typescript": "export type FindingsResponse = {\n  rows: FindingRow[];\n};"
+      },
+      "GraphData": {
+        "x-typescript": "export type GraphData = {\n  nodes: ObjectRow[];\n  edges: { from_id: string; to_id: string }[];\n  missing_edges: { from_id: string; to_id: string }[];\n  limits: Record<string, unknown>;\n  truncated?: boolean;\n};"
+      },
+      "GraphParams": {
+        "x-typescript": "export type GraphParams = {\n  snapshot_id?: number;\n  root_object_id: string;\n  direction?: string;\n  depth?: number;\n  node_limit?: number;\n  edge_limit?: number;\n};"
+      },
+      "IdsetRequest": {
+        "x-typescript": "export type IdsetRequest = {\n  snapshot_id: number;\n  left_query: string;\n  right_query: string;\n  op: string;\n  details?: boolean;\n  limit?: number;\n};"
+      },
+      "IdsetResponse": {
+        "x-typescript": "export type IdsetResponse = Record<string, unknown>;"
+      },
+      "JobData": {
+        "x-typescript": "export type JobData = {\n  job_id: string;\n  kind: string;\n  status: \"queued\" | \"running\" | \"succeeded\" | \"failed\" | \"canceling\" | \"canceled\";\n  progress: number;\n  message?: string | null;\n  result?: Record<string, unknown>;\n  created_at: string;\n  updated_at: string;\n};"
+      },
+      "ModuleRow": {
+        "x-typescript": "export type ModuleRow = {\n  module: string;\n  count: number;\n  shallow_size_sum: number;\n  in_edges?: number;\n  out_edges?: number;\n  estimated_reachable_size_sum?: number;\n  estimated_reachable_size_max?: number;\n  reachable_truncated_count?: number;\n};"
+      },
+      "ObjectDetailResponse": {
+        "x-typescript": "export type ObjectDetailResponse = {\n  object: ObjectRow;\n  top_referents: ObjectRow[];\n  top_referrers: ObjectRow[];\n};"
+      },
+      "ObjectEdgesResponse": {
+        "x-typescript": "export type ObjectEdgesResponse = Record<string, unknown>;"
+      },
+      "ObjectListParams": {
+        "x-typescript": "export type ObjectListParams = {\n  snapshot_id?: number;\n  q?: string;\n  type?: string;\n  module?: string;\n  cohort?: string;\n  min_shallow_size?: string;\n  min_reachable_size?: string;\n  min_in_edges?: string;\n  min_out_edges?: string;\n  has_referrers?: boolean;\n  missing_referents?: boolean;\n  stub?: string;\n  sort?: string;\n  order?: string;\n  limit?: number;\n  offset?: number;\n};"
+      },
+      "ObjectPathsParams": {
+        "x-typescript": "export type ObjectPathsParams = {\n  snapshot_id?: number;\n  direction?: string;\n  depth?: number;\n  fanout_limit?: number;\n  limit?: number;\n  include_core?: boolean;\n};"
+      },
+      "ObjectPathsResponse": {
+        "x-typescript": "export type ObjectPathsResponse = {\n  paths: string[][];\n};"
+      },
+      "ObjectRow": {
+        "x-typescript": "export type ObjectRow = {\n  object_id: string;\n  type: string;\n  module: string;\n  shallow_size: number;\n  estimated_reachable_size: number;\n  reachable_truncated: number;\n  in_edges: number;\n  out_edges: number;\n  stub: number;\n  missing_referents: number;\n};"
+      },
+      "OpenApiDocument": {
+        "x-typescript": "export type OpenApiDocument = Record<string, unknown>;"
+      },
+      "ReachabilityRecomputeRequest": {
+        "x-typescript": "export type ReachabilityRecomputeRequest = {\n  snapshot_id?: number;\n  depth?: number;\n  node_limit?: number;\n  fanout_limit?: number;\n};"
+      },
+      "ReportJson": {
+        "x-typescript": "export type ReportJson = Record<string, unknown>;"
+      },
+      "SaveIdsetRequest": {
+        "x-typescript": "export type SaveIdsetRequest = {\n  snapshot_id: number;\n  name: string;\n  object_ids: string[];\n  source?: unknown;\n};"
+      },
+      "SaveIdsetResponse": {
+        "x-typescript": "export type SaveIdsetResponse = {\n  idset: SavedIdset;\n  rows: ObjectRow[];\n};"
+      },
+      "SavedIdset": {
+        "x-typescript": "export type SavedIdset = {\n  idset_id: number;\n  snapshot_id: number;\n  name: string;\n  object_count: number;\n  created_at: string;\n  source?: unknown;\n};"
+      },
+      "SavedIdsetsResponse": {
+        "x-typescript": "export type SavedIdsetsResponse = {\n  rows: SavedIdset[];\n};"
+      },
+      "SchemaSummary": {
+        "x-typescript": "export type SchemaSummary = {\n  tables: { name: string; sql: string }[];\n  columns: Record<string, { name: string; type: string; notnull: number; pk: number }[]>;\n};"
+      },
+      "SessionInfo": {
+        "x-typescript": "export type SessionInfo = {\n  database_path: string;\n  schema_version: number;\n  tool_version: string;\n};"
+      },
+      "Snapshot": {
+        "x-typescript": "export type Snapshot = {\n  snapshot_id: number;\n  source_basename: string;\n  object_count: number;\n  edge_count: number;\n  shallow_size_sum: number;\n};"
+      },
+      "SnapshotOnlyParams": {
+        "x-typescript": "export type SnapshotOnlyParams = {\n  snapshot_id?: number;\n  limit?: number;\n};"
+      },
+      "SnapshotsResponse": {
+        "x-typescript": "export type SnapshotsResponse = {\n  rows: Snapshot[];\n};"
+      },
+      "SqlQueryResponse": {
+        "x-typescript": "export type SqlQueryResponse = Record<string, unknown> | JobData;"
+      },
+      "SqlRequest": {
+        "x-typescript": "export type SqlRequest = {\n  query: string;\n  limit?: number;\n  async?: boolean;\n};"
+      },
+      "StatRow": {
+        "x-typescript": "export type StatRow = {\n  type: string;\n  module: string;\n  count: number;\n  shallow_size_sum: number;\n  in_edges?: number;\n  out_edges?: number;\n  stub_count?: number;\n  estimated_reachable_size_sum?: number;\n  estimated_reachable_size_max?: number;\n  reachable_truncated_count?: number;\n};"
+      },
+      "Summary": {
+        "x-typescript": "export type Summary = {\n  snapshot: Snapshot;\n  top_types_by_shallow_size: StatRow[];\n  top_modules_by_shallow_size: ModuleRow[];\n  top_reachable_types: StatRow[];\n  missing_stub_summary: { stub_count: number; missing_referent_count: number };\n  import_warnings: unknown[];\n};"
+      }
+    }
+  },
+  "info": {
+    "title": "pygco local API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/cohorts": {
+      "get": {
+        "operationId": "listCohorts",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "cohorts",
+          "pathParams": [],
+          "querySchema": "AggregateParams",
+          "responseMode": "data",
+          "responseSchema": "CohortRow[]"
+        }
+      }
+    },
+    "/api/diff": {
+      "get": {
+        "operationId": "getDiff",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "diff",
+          "pathParams": [],
+          "querySchema": "DiffParams",
+          "responseMode": "data",
+          "responseSchema": "DiffSummary"
+        }
+      }
+    },
+    "/api/diff/objects": {
+      "get": {
+        "operationId": "listDiffObjects",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "diffObjects",
+          "pathParams": [],
+          "querySchema": "DiffObjectsParams",
+          "responseMode": "data",
+          "responseSchema": "DiffObjectsResponse"
+        }
+      }
+    },
+    "/api/findings": {
+      "get": {
+        "operationId": "listFindings",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "findings",
+          "pathParams": [],
+          "querySchema": "FindingsParams",
+          "responseMode": "data",
+          "responseSchema": "FindingsResponse"
+        }
+      }
+    },
+    "/api/graph": {
+      "get": {
+        "operationId": "getGraph",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "graph",
+          "pathParams": [],
+          "querySchema": "GraphParams",
+          "responseMode": "data",
+          "responseSchema": "GraphData"
+        }
+      }
+    },
+    "/api/idset": {
+      "post": {
+        "operationId": "runIdset",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "bodySchema": "IdsetRequest",
+          "methodName": "idset",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "IdsetResponse"
+        }
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "get": {
+        "operationId": "getJobStatus",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "jobStatus",
+          "pathParams": [
+            {
+              "name": "jobId",
+              "placeholder": "job_id",
+              "type": "string"
+            }
+          ],
+          "responseMode": "data",
+          "responseSchema": "JobData"
+        }
+      }
+    },
+    "/api/jobs/{job_id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "cancelJob",
+          "pathParams": [
+            {
+              "name": "jobId",
+              "placeholder": "job_id",
+              "type": "string"
+            }
+          ],
+          "responseMode": "data",
+          "responseSchema": "JobData"
+        }
+      }
+    },
+    "/api/modules": {
+      "get": {
+        "operationId": "listModules",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "modules",
+          "pathParams": [],
+          "querySchema": "AggregateParams",
+          "responseMode": "data",
+          "responseSchema": "ModuleRow[]"
+        }
+      }
+    },
+    "/api/objects": {
+      "get": {
+        "operationId": "listObjects",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "objects",
+          "pathParams": [],
+          "querySchema": "ObjectListParams",
+          "responseMode": "envelope",
+          "responseSchema": "ObjectRow[]"
+        }
+      }
+    },
+    "/api/objects/{object_id}": {
+      "get": {
+        "operationId": "getObjectDetail",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "objectDetail",
+          "pathParams": [
+            {
+              "name": "objectId",
+              "placeholder": "object_id",
+              "type": "string"
+            }
+          ],
+          "querySchema": "SnapshotOnlyParams",
+          "responseMode": "data",
+          "responseSchema": "ObjectDetailResponse"
+        }
+      }
+    },
+    "/api/objects/{object_id}/edges": {
+      "get": {
+        "operationId": "getObjectEdges",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "objectEdges",
+          "pathParams": [
+            {
+              "name": "objectId",
+              "placeholder": "object_id",
+              "type": "string"
+            }
+          ],
+          "querySchema": "EdgesParams",
+          "responseMode": "data",
+          "responseSchema": "ObjectEdgesResponse"
+        }
+      }
+    },
+    "/api/objects/{object_id}/paths": {
+      "get": {
+        "operationId": "getObjectPaths",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "objectPaths",
+          "pathParams": [
+            {
+              "name": "objectId",
+              "placeholder": "object_id",
+              "type": "string"
+            }
+          ],
+          "querySchema": "ObjectPathsParams",
+          "responseMode": "data",
+          "responseSchema": "ObjectPathsResponse"
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "openapi",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "OpenApiDocument"
+        }
+      }
+    },
+    "/api/reachability/recompute": {
+      "post": {
+        "operationId": "recomputeReachability",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "bodySchema": "ReachabilityRecomputeRequest",
+          "methodName": "recomputeReachability",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "JobData"
+        }
+      }
+    },
+    "/api/report.json": {
+      "get": {
+        "operationId": "getReportJson",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "reportJson",
+          "pathParams": [],
+          "querySchema": "SnapshotOnlyParams",
+          "responseMode": "data",
+          "responseSchema": "ReportJson"
+        }
+      }
+    },
+    "/api/report.md": {
+      "get": {
+        "operationId": "getReportMarkdown",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "reportMarkdown",
+          "pathParams": [],
+          "querySchema": "SnapshotOnlyParams",
+          "responseMode": "text",
+          "responseSchema": "string"
+        }
+      }
+    },
+    "/api/saved-idsets": {
+      "get": {
+        "operationId": "listSavedIdsets",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "savedIdsets",
+          "pathParams": [],
+          "querySchema": "SnapshotOnlyParams",
+          "responseMode": "data",
+          "responseSchema": "SavedIdsetsResponse"
+        }
+      },
+      "post": {
+        "operationId": "saveIdset",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "bodySchema": "SaveIdsetRequest",
+          "methodName": "saveIdset",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SaveIdsetResponse"
+        }
+      }
+    },
+    "/api/saved-idsets/{idset_id}": {
+      "get": {
+        "operationId": "getSavedIdset",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "savedIdsetDetail",
+          "pathParams": [
+            {
+              "name": "idsetId",
+              "placeholder": "idset_id",
+              "type": "number"
+            }
+          ],
+          "responseMode": "data",
+          "responseSchema": "SaveIdsetResponse"
+        }
+      }
+    },
+    "/api/schema": {
+      "get": {
+        "operationId": "getSchema",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "schema",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SchemaSummary"
+        }
+      }
+    },
+    "/api/session": {
+      "get": {
+        "operationId": "getSession",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "session",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SessionInfo"
+        }
+      }
+    },
+    "/api/snapshots": {
+      "get": {
+        "operationId": "listSnapshots",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "snapshots",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SnapshotsResponse"
+        }
+      }
+    },
+    "/api/sql/explain": {
+      "post": {
+        "operationId": "explainSqlQuery",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "bodySchema": "SqlRequest",
+          "methodName": "sqlExplain",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SqlQueryResponse"
+        }
+      }
+    },
+    "/api/sql/query": {
+      "post": {
+        "operationId": "runSqlQuery",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "bodySchema": "SqlRequest",
+          "methodName": "sqlQuery",
+          "pathParams": [],
+          "responseMode": "data",
+          "responseSchema": "SqlQueryResponse"
+        }
+      }
+    },
+    "/api/summary": {
+      "get": {
+        "operationId": "getSummary",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "summary",
+          "pathParams": [],
+          "querySchema": "SnapshotOnlyParams",
+          "responseMode": "data",
+          "responseSchema": "Summary"
+        }
+      }
+    },
+    "/api/types": {
+      "get": {
+        "operationId": "listTypes",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "types",
+          "pathParams": [],
+          "querySchema": "AggregateParams",
+          "responseMode": "data",
+          "responseSchema": "StatRow[]"
+        }
+      }
+    }
+  }
+}

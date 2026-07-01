@@ -1,0 +1,89 @@
+{
+  "cohort_delta": [
+    {
+      "cohort": "database_cache",
+      "count_delta": 1,
+      "from_count": 0,
+      "from_shallow_size": 0,
+      "shallow_size_delta": 72,
+      "to_count": 1,
+      "to_shallow_size": 72
+    }
+  ],
+  "confidence": {
+    "level": "high",
+    "message": "Object id lifecycle is strongest for consecutive dumps from the same process."
+  },
+  "from_snapshot_id": 1,
+  "module_delta": [
+    {
+      "count_delta": 1,
+      "from_count": 0,
+      "from_shallow_size": 0,
+      "module": "redis",
+      "shallow_size_delta": 72,
+      "to_count": 1,
+      "to_shallow_size": 72
+    },
+    {
+      "count_delta": 0,
+      "from_count": 1,
+      "from_shallow_size": 40,
+      "module": "app",
+      "shallow_size_delta": 40,
+      "to_count": 1,
+      "to_shallow_size": 80
+    },
+    {
+      "count_delta": 0,
+      "from_count": 1,
+      "from_shallow_size": 280,
+      "module": "builtins",
+      "shallow_size_delta": 0,
+      "to_count": 1,
+      "to_shallow_size": 280
+    }
+  ],
+  "object_lifecycle": {
+    "gone_count": 0,
+    "new_count": 1,
+    "retained_count": 2
+  },
+  "summary_delta": {
+    "edge_count": 1,
+    "missing_referent_count": 0,
+    "object_count": 1,
+    "shallow_size_sum": 112,
+    "stub_count": 0
+  },
+  "to_snapshot_id": 2,
+  "type_delta": [
+    {
+      "count_delta": 1,
+      "from_count": 0,
+      "from_shallow_size": 0,
+      "shallow_size_delta": 72,
+      "to_count": 1,
+      "to_shallow_size": 72,
+      "type": "redis.ConnectionPool"
+    },
+    {
+      "count_delta": 0,
+      "from_count": 1,
+      "from_shallow_size": 40,
+      "shallow_size_delta": 40,
+      "to_count": 1,
+      "to_shallow_size": 80,
+      "type": "app.Widget"
+    },
+    {
+      "count_delta": 0,
+      "from_count": 1,
+      "from_shallow_size": 280,
+      "shallow_size_delta": 0,
+      "to_count": 1,
+      "to_shallow_size": 280,
+      "type": "dict"
+    }
+  ]
+}
