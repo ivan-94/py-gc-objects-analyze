@@ -19,6 +19,7 @@
 - Linux release acceptance workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586150834
 - TestPyPI publish rehearsal workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586504894
 - TestPyPI publish rehearsal retry workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28589579759
+- TestPyPI publish rehearsal success workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28592147240
 - Lightweight unit CI confirmation run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28587516812
 - GitHub Release tag: `v0.1.0-rc.3`
 - GitHub Release URL: https://github.com/ivan-94/py-gc-objects-analyze/releases/tag/untagged-d5226fc5b2c3a3d763e8
@@ -39,7 +40,7 @@
 - `v0.1.0-rc.3` remains a draft release candidate. It is valid for release artifact HAT, but the public `releases/latest/download/install.sh` path still needs one final check after publishing a non-draft release.
 - The Linux HAT uses a manual `workflow_dispatch` Ubuntu runner instead of push/PR CI. This keeps routine CI to simple unit checks.
 - Draft release assets were installed with `PYGCO_DOWNLOAD_BASE_URL=file://...` after authenticated download from GitHub Releases. This validates the release `install.sh` and assets without requiring public non-draft visibility.
-- PyPI/TestPyPI publishing was not marked complete because `pygco-dump` is not visible on PyPI or TestPyPI and Trusted Publishing/project ownership setup is external to the repository.
+- TestPyPI publishing is accepted for rehearsal after configuring the pending trusted publisher. Production PyPI publishing remains a separate maintainer approval step and is not performed by this HAT.
 
 ### Verification evidence
 
@@ -62,6 +63,11 @@
 - FastAPI helper was installed from the local wheel in a clean venv and produced an `application/gzip` dump stream with `metadata/start` and `metadata/end` records.
 - TestPyPI publish rehearsal run `28586504894` built the wheel and sdist, passed `twine check`, and tested the built wheel; upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
 - TestPyPI publish rehearsal retry `28589579759` again passed package build, `twine check`, built-wheel smoke, and artifact upload; the TestPyPI upload still failed with `invalid-publisher` for matching repository/workflow/environment claims.
+- TestPyPI pending trusted publisher was configured through Chrome without screenshots for project `pygco-dump`, owner `ivan-94`, repository `py-gc-objects-analyze`, workflow `publish-python.yml`, environment `testpypi`.
+- TestPyPI publish rehearsal `28592147240` completed successfully on commit `fc336363a3b5c7cd498e8c946f08f877464781e8`; build, `twine check`, built-wheel smoke, and `publish-testpypi` passed, while the production PyPI job was skipped.
+- `python3 -m pip index versions --index-url https://test.pypi.org/simple/ pygco-dump` found `pygco-dump (0.1.0)`.
+- Clean TestPyPI install/import smoke passed in `.scratch/testpypi-venv` after installing `fastapi>=0.115.0` from PyPI and installing `pygco-dump[fastapi]` from TestPyPI with `--no-deps`.
+- Direct TestPyPI install with `--extra-index-url https://pypi.org/simple` was not used as HAT evidence because dependency resolution selected an unrelated invalid TestPyPI `FASTAPI-1.0` package before falling back to PyPI.
 - Lightweight CI run `28587516812` passed on commit `a81fcdf` with only `rust-unit`, `python-unit`, and `web-unit`.
 - Release dry-run `28587529503` passed with `tag=dry-run-attest`; `Attest release artifacts` created provenance for 8 subjects, and `gh attestation verify` passed for `.scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz`.
 - Chrome DOM verification was performed without screenshots:
@@ -72,7 +78,7 @@
 
 ### Open questions / risks
 
-- HAT-7 is still open: configure the TestPyPI trusted publisher for owner `ivan-94`, repository `py-gc-objects-analyze`, workflow `publish-python.yml`, environment `testpypi`, then rerun `publish-python` with `target=testpypi` and install `pygco-dump[fastapi]` from TestPyPI.
+- Production PyPI Trusted Publishing for `pygco-dump` still needs to be configured before the non-draft 0.1.0 release.
 - The final public `curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/download/install.sh | sh` path must be checked after publishing a non-draft release.
 - The macOS x86_64 archive was runtime-smoked under Rosetta, not on a physical Intel Mac.
 - Release artifact signing or GitHub artifact attestation remains P1 hardening for the already-created `v0.1.0-rc.3` draft assets; later release workflow dry run `28587529503` validated attestations for future tags.
@@ -94,9 +100,9 @@
 - [x] HAT-4: Ran `pygco version`.
 - [x] HAT-5: Ran `pygco open fixtures/golden/tiny-v1.jsonl.gz --no-browser`.
 - [x] HAT-6: Ran explicit import, summary, objects, diff, and report commands against golden fixtures.
-- [ ] HAT-7: Install `pygco-dump[fastapi]` from PyPI or TestPyPI in a clean virtual environment.
+- [x] HAT-7: Install `pygco-dump[fastapi]` from PyPI or TestPyPI in a clean virtual environment.
 - [x] HAT-8: Ran the FastAPI helper from a clean local-wheel venv and pulled a gzip dump.
-- [x] HAT-9: Confirmed README, install docs, quickstart, security docs, known limitations, and compatibility notes match observed behavior, except for the intentionally unverified PyPI/TestPyPI publish path.
+- [x] HAT-9: Confirmed README, install docs, quickstart, security docs, known limitations, and compatibility notes match observed behavior, with TestPyPI publish rehearsal accepted and production PyPI still pending.
 - [x] HAT-10: Confirmed release notes list versioned artifact names, checksum commands, compatibility versions, and known limitations.
 
 ## Command Evidence
@@ -121,8 +127,18 @@ gh run download 28586150834 --name release-acceptance-linux --dir .scratch/hat-l
 gh workflow run release.yml -f tag=dry-run-attest -f dry_run=true --ref main
 gh run watch 28587529503 --exit-status
 gh attestation verify .scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz --repo ivan-94/py-gc-objects-analyze --format json
+gh workflow run publish-python.yml -f target=testpypi --ref main
+gh run watch 28592147240 --exit-status
+python3 -m pip index versions --index-url https://test.pypi.org/simple/ pygco-dump
+rm -rf .scratch/testpypi-venv
+python3 -m venv .scratch/testpypi-venv
+. .scratch/testpypi-venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install 'fastapi>=0.115.0'
+python -m pip install --index-url https://test.pypi.org/simple/ --no-deps 'pygco-dump[fastapi]'
+python -c 'from pygco_dump import write_gc_dump; from pygco_dump.fastapi import gc_heap_dump_route; assert callable(write_gc_dump); assert callable(gc_heap_dump_route)'
 ```
 
 ## Result
 
-The GitHub Release binary artifact path is accepted for `v0.1.0-rc.3` on Linux x86_64 and macOS Apple Silicon, with an additional macOS x86_64 Rosetta runtime smoke. The remaining P0 release blocker is PyPI/TestPyPI Trusted Publishing and package publication rehearsal for `pygco-dump`.
+The GitHub Release binary artifact path is accepted for `v0.1.0-rc.3` on Linux x86_64 and macOS Apple Silicon, with an additional macOS x86_64 Rosetta runtime smoke. The `pygco-dump` TestPyPI publication rehearsal and clean install/import path are accepted. Remaining pre-release work is production PyPI Trusted Publishing/publish approval and the final public `releases/latest` installer check after a non-draft release is published.

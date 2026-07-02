@@ -68,6 +68,17 @@ The 2026-07-02 TestPyPI rehearsal run `28586504894` built the wheel and sdist su
 
 Retry run `28589579759` produced the same result: build, `twine check`, built-wheel smoke, and artifact upload passed; TestPyPI still rejected the trusted publishing exchange with `invalid-publisher` for repository `ivan-94/py-gc-objects-analyze`, workflow `publish-python.yml@refs/heads/main`, and environment `testpypi`.
 
+After configuring the TestPyPI pending trusted publisher, run `28592147240` published `pygco-dump 0.1.0` to TestPyPI successfully. The production PyPI publisher is still a separate maintainer setup step before the non-draft release.
+
+For TestPyPI install rehearsals, install runtime dependencies from PyPI first, then install the TestPyPI wheel with `--no-deps`:
+
+```bash
+python -m pip install 'fastapi>=0.115.0'
+python -m pip install --index-url https://test.pypi.org/simple/ --no-deps 'pygco-dump[fastapi]'
+```
+
+Avoid using TestPyPI together with `--extra-index-url` for acceptance evidence; unrelated packages on TestPyPI can win dependency resolution before pip falls back to PyPI.
+
 ## HAT Checklist
 
 - [ ] Install `pygco` through the release installer on Linux.
