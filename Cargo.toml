@@ -30,7 +30,7 @@ clap = { version = "4.5.28", features = ["derive"] }
 flate2 = "1.0.35"
 http = "1.2.0"
 reqwest = { version = "0.12.12", default-features = false, features = ["blocking", "rustls-tls"] }
-rusqlite = { version = "0.32.1", features = ["bundled", "chrono"] }
+rusqlite = { version = "0.40.1", features = ["bundled", "chrono"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 sha2 = "0.10.8"
