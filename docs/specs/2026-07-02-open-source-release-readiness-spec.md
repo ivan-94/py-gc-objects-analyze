@@ -73,6 +73,7 @@
   - `main` is pushed to `ivan-94/py-gc-objects-analyze`.
   - GitHub Actions CI run `28582013621` passed on commit `9c38ba0`.
   - Pull request CI run `28582123395` passed on a Dependabot PR.
+  - After maintainer feedback, PR/push CI was simplified to lightweight docs/unit checks; release artifact, Web E2E, and benchmark checks stay in dedicated release/benchmark workflows.
   - Manual benchmark workflow run `28581056797` passed.
   - GitHub Release workflow run `28582024816` passed for tag `v0.1.0-rc.2` and produced a draft release.
   - `gh release download v0.1.0-rc.2 --repo ivan-94/py-gc-objects-analyze --dir .scratch/rc2` downloaded `install.sh`, `checksums.txt`, three target archives, and their per-archive `.sha256` files.
@@ -437,47 +438,46 @@ Verification:
 
 External note: TestPyPI/PyPI Trusted Publishing must be configured in the GitHub repository and package index before this can be checked.
 
-### P0-S7. CI Release Gate
+### P0-S7. Lightweight PR CI and Release Gates
 
 Priority: P0
 Owner: CI/maintainer
 Depends on: P0-S1 through P0-S4
 
-Goal: make pull requests catch release-breaking drift before tagging.
+Goal: keep ordinary PR feedback fast and unit-test oriented, while reserving release artifact, Web E2E, and benchmark validation for dedicated release/benchmark workflows.
 
 Tasks:
 
-- [x] Add docs command check to CI: `python3 scripts/check_docs_commands.py`.
-- [x] Add generated docs freshness check for CLI help and OpenAPI.
-- [x] Add Python lint/check command, preferably `ruff check python/pygco_dump`.
-- [x] Add Python version matrix that matches the declared support policy.
-- [x] Add Rust fmt, clippy, test, and release build checks.
-- [x] Add Web install/typecheck/build/e2e checks.
-- [x] Add package-build smoke checks:
-  - [x] Python wheel/sdist build
-  - [x] installer local-fixture test
+- [x] Keep PR/push CI lightweight:
+  - [x] `docs-light`: `python3 scripts/check_docs_commands.py`
+  - [x] `rust-unit`: `cargo test --workspace`
+  - [x] `python-unit`: `python -m pytest python/pygco_dump` on the default supported Python version
+  - [x] `web-unit`: `pnpm --dir web/app test`
+- [x] Remove heavyweight PR/push CI checks:
+  - [x] Rust clippy and release build
+  - [x] generated CLI/OpenAPI freshness
+  - [x] Web build and Playwright E2E
   - [x] release archive packaging smoke
-- [x] Consider splitting CI into jobs so docs/Python/Rust/Web/release-smoke failures are readable.
+  - [x] synthetic benchmark smoke
+- [x] Keep release artifact and embedded Web UI checks in `.github/workflows/release.yml`.
+- [x] Keep scheduled/manual performance checks in `.github/workflows/benchmarks.yml`.
+- [x] Keep maintainer-side full verification commands documented for release preparation.
 
 Acceptance:
 
-- [x] CI fails if docs reference commands that no longer exist.
-- [x] CI fails if generated CLI/OpenAPI artifacts are stale.
-- [x] CI fails if release build would embed fallback Web UI assets.
-- [x] CI duration remains practical enough for normal changes; main CI run `28582013621` completed successfully in a practical window.
+- [x] PR CI does not install browser dependencies or run Playwright.
+- [x] PR CI does not build release artifacts.
+- [x] PR CI does not run benchmark smoke tests.
+- [x] Tag release workflow still fails if Web UI assets are missing or placeholder assets are embedded.
 
 Verification:
 
-- [x] Pull request CI run `28582123395`.
-- [x] Main branch CI run `28582013621`.
-- [x] Local equivalent:
+- [ ] First lightweight main or PR CI run after the simplification.
+- [x] Local lightweight equivalent:
   - [x] `python3 scripts/check_docs_commands.py`
-  - [x] `cargo fmt --check`
-  - [x] `cargo clippy --all-targets --all-features -- -D warnings`
   - [x] `cargo test --workspace`
   - [x] `python -m pytest python/pygco_dump`
-  - [x] `(cd web/app && corepack pnpm build)`
-  - [x] `(cd web/app && corepack pnpm test:e2e)`
+  - [x] `pnpm --dir web/app test`
 
 ### P0-S8. Clean-Machine Acceptance Guide
 
@@ -789,7 +789,7 @@ P0 is done when:
 - [x] License, contributing, security, templates, package metadata, and changelog are present.
 - [x] GitHub Release workflow can produce installer, archives, checksums, and draft release notes.
 - [ ] PyPI workflow can publish `pygco-dump` through a rehearsed path. Requires TestPyPI/PyPI Trusted Publishing setup and rehearsal.
-- [x] CI gates docs, Rust, Python, Web UI, generated docs, package builds, and release smoke checks locally and in workflow definitions.
+- [x] PR/push CI gates lightweight docs and unit checks; release and benchmark workflows gate heavyweight artifact, Web E2E, and performance checks.
 - [ ] Clean-machine acceptance passes on the supported P0 targets.
 
 P1 is done when:
