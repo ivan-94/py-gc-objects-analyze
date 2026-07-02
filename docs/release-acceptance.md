@@ -30,7 +30,7 @@ The preflight is read-only. It checks local tools, `origin`, GitHub CLI authenti
 When a local Linux machine is not available, run the manual `release-acceptance` workflow against a draft or published release tag:
 
 ```bash
-gh workflow run release-acceptance.yml -f tag=v0.1.0-rc.3
+gh workflow run release-acceptance.yml -f tag=v0.1.0
 ```
 
 The workflow downloads GitHub Release assets, verifies `checksums.txt`, installs through the release `install.sh`, and runs the fixture import, summary, objects, diff, report, and `open --no-browser` smoke commands on an Ubuntu runner. It is intentionally `workflow_dispatch` only and does not run on push or pull request CI.
@@ -71,6 +71,8 @@ Retry run `28589579759` produced the same result: build, `twine check`, built-wh
 After configuring the TestPyPI pending trusted publisher, run `28592147240` published `pygco-dump 0.1.0` to TestPyPI successfully. The production PyPI publisher is still a separate maintainer setup step before the non-draft release.
 
 `publish-python.yml` is intentionally `workflow_dispatch` only. Publish `pygco-dump` to PyPI explicitly before making the GitHub Release public; publishing a GitHub Release should not retry a package version that already exists on PyPI.
+
+Production PyPI run `28596078256` published `pygco-dump 0.1.0` successfully. `python -m pip install "pygco-dump[fastapi]"` passed in a clean virtual environment after the publish.
 
 For TestPyPI install rehearsals, install runtime dependencies from PyPI first, then install the TestPyPI wheel with `--no-deps`:
 

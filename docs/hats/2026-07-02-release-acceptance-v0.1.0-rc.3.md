@@ -1,5 +1,7 @@
 # Release Acceptance HAT: v0.1.0-rc.3
 
+Superseded by the final `v0.1.0` HAT at `docs/hats/2026-07-02-release-acceptance-v0.1.0.md`. This report remains as release-candidate evidence and preserves the state observed before the final PyPI publish and public GitHub Release.
+
 ## Source Manifest
 
 ### Sources
