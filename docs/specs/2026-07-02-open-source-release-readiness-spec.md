@@ -90,6 +90,8 @@
   - macOS Apple Silicon HAT installed from downloaded release assets and ran `version`, `open`, import, summary, objects, diff, and report commands.
   - macOS x86_64 archive ran `version`, `import`, and `summary` under Rosetta.
   - Clean local-wheel FastAPI helper smoke produced an `application/gzip` dump stream with metadata start/end records.
+  - `publish-python` workflow dispatch run `28586504894` built `pygco_dump-0.1.0.tar.gz` and `pygco_dump-0.1.0-py3-none-any.whl`, passed `twine check`, and tested the built wheel.
+  - The same TestPyPI publish rehearsal failed at the upload step with `invalid-publisher`; the reported trusted publisher claim was `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
 - Chrome DOM verification was run without screenshots:
   - Repository page rendered README install/quickstart content and license/contributing/security entry links.
   - Issue template chooser rendered bug, memory investigation feedback, documentation issue, feature request, and release checklist templates.
@@ -449,7 +451,7 @@ Verification:
 - [x] `python -m pytest python/pygco_dump`
 - [ ] TestPyPI rehearsal before first PyPI publish.
 
-External note: TestPyPI/PyPI Trusted Publishing must be configured in the GitHub repository and package index before this can be checked.
+External note: TestPyPI/PyPI Trusted Publishing must be configured in the package index before publish can pass. Rehearsal run `28586504894` confirmed the repository workflow builds and validates the package; TestPyPI rejected upload with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
 
 ### P0-S7. Lightweight PR CI and Release Gates
 

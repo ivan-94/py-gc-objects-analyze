@@ -35,6 +35,17 @@ gh workflow run release-acceptance.yml -f tag=v0.1.0-rc.3
 
 The workflow downloads GitHub Release assets, verifies `checksums.txt`, installs through the release `install.sh`, and runs the fixture import, summary, objects, diff, report, and `open --no-browser` smoke commands on an Ubuntu runner. It is intentionally `workflow_dispatch` only and does not run on push or pull request CI.
 
+## PyPI Trusted Publishing Setup
+
+Before HAT can check the TestPyPI/PyPI install path, configure a trusted publisher on the package index. Follow the official [PyPI Trusted Publishers guide](https://docs.pypi.org/trusted-publishers/) and use these claims from `.github/workflows/publish-python.yml`:
+
+| Index | Project | Owner | Repository | Workflow | Environment |
+| --- | --- | --- | --- | --- | --- |
+| TestPyPI | `pygco-dump` | `ivan-94` | `py-gc-objects-analyze` | `publish-python.yml` | `testpypi` |
+| PyPI | `pygco-dump` | `ivan-94` | `py-gc-objects-analyze` | `publish-python.yml` | `pypi` |
+
+The 2026-07-02 TestPyPI rehearsal run `28586504894` built the wheel and sdist successfully, passed `twine check`, and tested the built wheel. The upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`, which means the matching TestPyPI trusted publisher was not configured yet.
+
 ## HAT Checklist
 
 - [ ] Install `pygco` through the release installer on Linux.

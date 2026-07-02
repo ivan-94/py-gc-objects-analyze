@@ -16,6 +16,7 @@
 - Release scripts: `scripts/install.sh`, `scripts/package_release.sh`, `scripts/render_release_notes.py`
 - GitHub Release workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28584497200
 - Linux release acceptance workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586150834
+- TestPyPI publish rehearsal workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586504894
 - GitHub Release tag: `v0.1.0-rc.3`
 - GitHub Release URL: https://github.com/ivan-94/py-gc-objects-analyze/releases/tag/untagged-d5226fc5b2c3a3d763e8
 
@@ -54,12 +55,13 @@
 - macOS HAT ran on macOS 27.0 arm64 with Python 3.14.0.
 - macOS x86_64 archive ran `pygco version`, `import`, and `summary` under Rosetta on Apple Silicon.
 - FastAPI helper was installed from the local wheel in a clean venv and produced an `application/gzip` dump stream with `metadata/start` and `metadata/end` records.
+- TestPyPI publish rehearsal run `28586504894` built the wheel and sdist, passed `twine check`, and tested the built wheel; upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
 - Chrome DOM verification was performed without screenshots against the local Web UI; the Overview navigation and page content rendered from the printed local URL.
 - `python3 scripts/check_docs_commands.py`, workflow YAML parsing, and `git diff --check` passed after the workflow/report updates.
 
 ### Open questions / risks
 
-- HAT-7 is still open: publish or rehearse `pygco-dump[fastapi]` from TestPyPI or PyPI after maintainer-owned Trusted Publishing is configured.
+- HAT-7 is still open: configure the TestPyPI trusted publisher for owner `ivan-94`, repository `py-gc-objects-analyze`, workflow `publish-python.yml`, environment `testpypi`, then rerun `publish-python` with `target=testpypi` and install `pygco-dump[fastapi]` from TestPyPI.
 - The final public `curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/download/install.sh | sh` path must be checked after publishing a non-draft release.
 - The macOS x86_64 archive was runtime-smoked under Rosetta, not on a physical Intel Mac.
 - Release artifact signing or GitHub artifact attestation remains P1 hardening beyond the current checksum verification.
