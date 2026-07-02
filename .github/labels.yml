@@ -1,0 +1,42 @@
+- name: area:cli
+  color: "1f77b4"
+  description: CLI behavior, output, or command contracts.
+- name: area:web
+  color: "9467bd"
+  description: Local Web UI, browser behavior, or visual regressions.
+- name: area:python-producer
+  color: "2ca02c"
+  description: pygco-dump package, FastAPI helper, or dump collection.
+- name: area:docs
+  color: "17becf"
+  description: Documentation, examples, or generated references.
+- name: area:release
+  color: "ff7f0e"
+  description: Release workflows, installer, PyPI, or artifacts.
+- name: type:bug
+  color: "d62728"
+  description: Confirmed or suspected defect.
+- name: type:feature
+  color: "2ca02c"
+  description: New capability or enhancement.
+- name: type:question
+  color: "7f7f7f"
+  description: Clarification or compatibility question.
+- name: priority:p0
+  color: "b00020"
+  description: Release blocker or severe user impact.
+- name: priority:p1
+  color: "e67e22"
+  description: Important, should be scheduled soon.
+- name: priority:p2
+  color: "f1c40f"
+  description: Useful but not urgent.
+- name: status:needs-repro
+  color: "cccccc"
+  description: Needs reproduction details.
+- name: status:needs-hat
+  color: "6f42c1"
+  description: Needs human acceptance testing.
+- name: good first issue
+  color: "7057ff"
+  description: Scoped for a first-time contributor.

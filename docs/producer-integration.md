@@ -248,3 +248,11 @@ def install_child_gc_dump(**kwargs: object) -> None:
 - 不要把 dump endpoint 或 signal 操作暴露给非受信用户。
 - 记录 dump 开始、结束、文件路径、PID、耗时和对象数量。
 - 在容器或 Kubernetes 中，确认 dump 目录会被保留或能被拷出。
+
+Before enabling an HTTP endpoint outside a developer laptop, confirm:
+
+- the route is behind an internal-only network boundary,
+- the route is disabled by default or protected by an explicit runtime flag,
+- operators know where dump files are written and how to delete them,
+- `repr` output is disabled unless the investigation explicitly needs it,
+- any shared dump has been reviewed for sensitive metadata.

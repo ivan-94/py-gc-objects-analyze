@@ -1457,8 +1457,7 @@ fn filename_from_url(url: &str) -> Option<String> {
     let parsed = reqwest::Url::parse(url).ok()?;
     parsed
         .path_segments()?
-        .filter(|segment| !segment.is_empty())
-        .next_back()
+        .rfind(|segment| !segment.is_empty())
         .map(str::to_owned)
 }
 
@@ -1854,9 +1853,7 @@ fn emit_with_table_fields(
 }
 
 fn parse_fields(fields: Option<&str>) -> Option<Vec<String>> {
-    let Some(fields) = fields else {
-        return None;
-    };
+    let fields = fields?;
     let fields: Vec<String> = fields
         .split(',')
         .map(str::trim)
@@ -1884,7 +1881,7 @@ fn apply_field_list(value: Value, fields: Option<&[String]>) -> Value {
     match value {
         Value::Array(rows) => Value::Array(
             rows.into_iter()
-                .map(|row| select_fields(row, &fields))
+                .map(|row| select_fields(row, fields))
                 .collect(),
         ),
         Value::Object(mut object) => {

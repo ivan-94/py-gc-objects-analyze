@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  test:
+  docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,6 +13,43 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - run: cargo build -p pygco-cli
+      - run: python3 scripts/check_docs_commands.py
+      - run: python3 scripts/generate_cli_docs.py
+      - run: python3 scripts/export_openapi.py
+      - run: git diff --exit-code docs/generated
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace
+      - run: cargo build --release -p pygco-cli
+
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip build ruff
+      - run: python -m pip install -e "python/pygco_dump[fastapi,test]"
+      - run: ruff check python/pygco_dump
+      - run: python -m pytest python/pygco_dump
+      - run: cd python/pygco_dump && python -m build
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -21,18 +58,42 @@ jobs:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: web/app/pnpm-lock.yaml
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-      - run: cargo test --workspace
-      - run: cargo build -p pygco-cli
-      - run: mkdir -p .scratch
-      - run: python fixtures/generators/generate_synthetic.py --objects 200 --fanout 2 --output .scratch/bench-smoke.jsonl.gz
-      - run: python benches/import_benchmark.py --dump .scratch/bench-smoke.jsonl.gz --keep-db .scratch/bench-smoke.sqlite
-      - run: python benches/query_api_benchmark.py --db .scratch/bench-smoke.sqlite --iterations 3
-      - run: python -m pip install -e "python/pygco_dump[fastapi,test]"
-      - run: python -m pytest python/pygco_dump
       - run: pnpm --dir web/app install --frozen-lockfile
       - run: pnpm --dir web/app typecheck
       - run: pnpm --dir web/app build
       - run: pnpm --dir web/app exec playwright install --with-deps chromium
       - run: pnpm --dir web/app test:e2e
+
+  release-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/app/pnpm-lock.yaml
+      - run: pnpm --dir web/app install --frozen-lockfile
+      - run: pnpm --dir web/app build
+      - run: PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli
+      - run: scripts/package_release.sh
+      - run: scripts/test_install.sh
+      - run: ./target/release/pygco import fixtures/golden/tiny-v1.jsonl.gz -o .scratch/release-smoke.sqlite --rebuild
+
+  bench-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: cargo build -p pygco-cli
+      - run: mkdir -p .scratch
+      - run: python fixtures/generators/generate_synthetic.py --objects 200 --fanout 2 --output .scratch/bench-smoke.jsonl.gz
+      - run: python benches/import_benchmark.py --dump .scratch/bench-smoke.jsonl.gz --keep-db .scratch/bench-smoke.sqlite
+      - run: python benches/query_api_benchmark.py --db .scratch/bench-smoke.sqlite --iterations 3

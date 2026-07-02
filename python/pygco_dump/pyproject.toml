@@ -8,7 +8,33 @@ version = "0.1.0"
 description = "Low-impact Python GC object dump producer for pygco"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "py-gc-objects-analyze maintainers" }]
+maintainers = [{ name = "py-gc-objects-analyze maintainers" }]
+keywords = ["python", "gc", "memory", "debugging", "forensics"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Web Environment",
+  "Framework :: FastAPI",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Debuggers",
+  "Topic :: System :: Monitoring",
+]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/ivan-94/py-gc-objects-analyze"
+Repository = "https://github.com/ivan-94/py-gc-objects-analyze"
+Documentation = "https://github.com/ivan-94/py-gc-objects-analyze/tree/main/docs"
+Issues = "https://github.com/ivan-94/py-gc-objects-analyze/issues"
+Changelog = "https://github.com/ivan-94/py-gc-objects-analyze/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 fastapi = ["fastapi>=0.115.0"]

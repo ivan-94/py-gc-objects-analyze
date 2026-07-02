@@ -1,0 +1,45 @@
+name: benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/app/pnpm-lock.yaml
+      - run: cargo build --release -p pygco-cli
+      - run: mkdir -p .scratch benches/reports
+      - run: python fixtures/generators/generate_synthetic.py --all
+      - run: python benches/import_benchmark.py --pygco target/release/pygco --dump fixtures/synthetic/medium.jsonl.gz --keep-db .scratch/medium-bench.sqlite > benches/reports/medium-import.json
+      - run: python benches/query_api_benchmark.py --pygco target/release/pygco --db .scratch/medium-bench.sqlite > benches/reports/medium-query-api.json
+      - run: pnpm --dir web/app install --frozen-lockfile
+      - run: pnpm --dir web/app build
+      - name: Record Web bundle sizes
+        run: |
+          {
+            echo "# Web bundle sizes"
+            echo
+            du -h web/app/dist/assets/*
+          } > benches/reports/web-bundle-size.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: benches/reports/*

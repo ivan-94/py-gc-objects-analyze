@@ -21,6 +21,27 @@ Included:
 - React Web UI for overview, objects, aggregate pages, object detail, graph, diff, findings, SQL/idset, schema, and report workflows.
 - Golden and synthetic fixtures plus import/query/API benchmark scripts.
 
+Release artifacts:
+
+- `install.sh`
+- `pygco-0.1.0-x86_64-unknown-linux-gnu.tar.gz`
+- `pygco-0.1.0-x86_64-apple-darwin.tar.gz`
+- `pygco-0.1.0-aarch64-apple-darwin.tar.gz`
+- per-archive `.sha256` files
+- `checksums.txt`
+
+Verify a downloaded archive with the adjacent checksum file:
+
+```bash
+sha256sum -c pygco-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+```
+
+On macOS:
+
+```bash
+shasum -a 256 -c pygco-0.1.0-aarch64-apple-darwin.tar.gz.sha256
+```
+
 Known boundaries:
 
 - Local single-user analysis only; no remote SaaS, login, RBAC, or sharing.

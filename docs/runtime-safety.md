@@ -60,6 +60,25 @@ producer 不做：
 - remote sharing
 - multi-user workspace
 
+## Internal-only endpoint patterns
+
+生产或类生产环境中，dump endpoint 必须作为内部诊断入口管理。推荐模式：
+
+- 默认关闭：通过 feature flag、环境变量或只在 debug build 中注册路由。
+- 只绑定内网：不要通过公网 ingress、CDN、API gateway public route 暴露。
+- 复用现有管理面鉴权：如果组织已有 admin plane，放在同一权限边界内。
+- 限制调用者：只允许受信 VPN、bastion、Kubernetes exec、临时 port-forward 或内部 SSO 管理用户触发。
+- 记录审计：记录触发人、时间、参数、PID、输出文件路径、对象数量和耗时。
+- 控制参数：默认 `collect=false`、`include_repr=false`，并为响应大小、超时和并发设置上限。
+- 明确保留策略：dump 文件和 SQLite 分析库默认视为敏感诊断产物，用完删除或放入受控存储。
+
+反模式：
+
+- 把 dump endpoint 放在业务 public API 下。
+- 允许任意用户传 `include_repr=true`。
+- 把 dump 文件上传到公共 issue、聊天工具或无访问控制的对象存储。
+- 在高峰流量中无审批地启用 `collect=true`。
+
 ## 临时文件
 
 `pygco open` 创建 session：

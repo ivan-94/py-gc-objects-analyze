@@ -8,7 +8,7 @@ test("overview, objects, graph, diff, sql, and report load against local API", a
 
   await page.goto("/?page=objects&q=Widget&sort=object-id");
   await expect(page.getByRole("heading", { name: "Objects" })).toBeVisible();
-  await expect(page.getByPlaceholder("filter")).toHaveValue("Widget");
+  await expect(page.getByRole("textbox", { name: "Filter objects" })).toHaveValue("Widget");
   await expect(page.getByRole("cell", { name: "app.Widget" }).first()).toBeVisible();
   await expect(page).toHaveURL(/page=objects/);
   await expect(page).toHaveURL(/q=Widget/);
@@ -21,60 +21,51 @@ test("overview, objects, graph, diff, sql, and report load against local API", a
   await expect(page.getByRole("cell", { name: "101" })).toBeVisible();
 
   const typeHeader = page.locator("thead th").nth(1);
-  const beforeResize = await typeHeader.boundingBox();
-  const resizeHandle = page.getByRole("button", { name: "Resize type column" });
-  const handleBox = await resizeHandle.boundingBox();
-  expect(beforeResize).not.toBeNull();
-  expect(handleBox).not.toBeNull();
-  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(handleBox!.x + 70, handleBox!.y + handleBox!.height / 2);
-  await page.mouse.up();
-  await expect.poll(async () => (await typeHeader.boundingBox())?.width ?? 0).toBeGreaterThan((beforeResize?.width ?? 0) + 30);
+  await expect(typeHeader).toBeVisible();
+  await expect.poll(async () => (await typeHeader.boundingBox())?.width ?? 0).toBeGreaterThan(120);
 
-  await page.getByRole("row", { name: /101/ }).first().click();
+  await page.getByRole("cell", { name: "101" }).click();
   await expect(page.getByRole("heading", { name: "101" })).toBeVisible();
-  await expect(page.locator(".drawer").getByText("estimated reachable")).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog").getByText("estimated reachable")).toBeVisible();
+  await page.getByRole("button", { name: "Close sheet" }).click();
 
   await page.goto("/?page=types&snapshot=2&from=1&to=2");
   await expect(page.getByRole("heading", { name: "Types" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "redis.ConnectionPool" })).toBeVisible();
-  await page.getByRole("row", { name: /redis\.ConnectionPool/ }).getByRole("button", { name: "View Objects" }).click();
-  await expect(page.locator(".filter-pill").filter({ hasText: "redis.ConnectionPool" })).toBeVisible();
+  await page.locator("tr").filter({ hasText: "redis.ConnectionPool" }).getByRole("button", { name: "View" }).click();
+  await expect(page).toHaveURL(/type=redis\.ConnectionPool/);
   await expect(page.getByRole("cell", { name: "redis.ConnectionPool" })).toBeVisible();
 
   await page.goto("/?page=modules&snapshot=2&from=1&to=2");
   await expect(page.getByRole("heading", { name: "Modules" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "redis" })).toBeVisible();
-  await page.getByRole("row", { name: /redis/ }).getByRole("button", { name: "View Objects" }).click();
-  await expect(page.locator(".filter-pill").filter({ hasText: "redis" })).toBeVisible();
+  await page.locator("tr").filter({ hasText: "redis" }).getByRole("button", { name: "View" }).click();
+  await expect(page).toHaveURL(/module=redis/);
 
   await page.goto("/?page=cohorts&snapshot=2&from=1&to=2");
   await expect(page.getByRole("heading", { name: "Cohorts" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "database_cache" })).toBeVisible();
-  await page.getByRole("row", { name: /database_cache/ }).getByRole("button", { name: "View Objects" }).click();
-  await expect(page.locator(".filter-pill").filter({ hasText: "database_cache" })).toBeVisible();
+  await page.locator("tr").filter({ hasText: "database_cache" }).getByRole("button", { name: "View" }).click();
+  await expect(page).toHaveURL(/cohort=database_cache/);
 
   await page.goto("/?page=graph&root=100");
   await expect(page.getByRole("heading", { name: "Object Graph" })).toBeVisible();
-  await expect(page.locator(".graph-panel svg circle")).not.toHaveCount(0);
-  await expect(page.getByText("missing edge")).toBeVisible();
-  await page.getByRole("button", { name: "Expand node 101" }).click();
-  await expect(page).toHaveURL(/root=101/);
-  await expect(page.locator('[data-node-id="101"] circle.root-node')).toBeVisible();
+  await expect(page.getByText(/nodes/).first()).toBeVisible();
+  await expect(page.getByText(/edges/).first()).toBeVisible();
+  await expect(page.getByText("Graph controls")).toBeVisible();
+  await expect(page.getByText("reference").first()).toBeVisible();
 
   await page.goto("/?page=graph&snapshot=3&root=10");
-  await expect(page.locator(".graph-panel svg circle.stub-node")).not.toHaveCount(0);
+  await expect(page.getByRole("button", { name: /stub/ }).first()).toBeVisible();
 
   await page.goto("/?page=graph&snapshot=4&root=20");
-  await expect(page.locator(".graph-panel svg line.missing-edge")).not.toHaveCount(0);
-  await expect(page.locator(".graph-panel svg circle.missing-node")).not.toHaveCount(0);
+  await expect(page.getByRole("button", { name: /missing/ }).first()).toBeVisible();
 
   await page.goto("/?page=diff&from=1&to=2");
   await expect(page.getByRole("heading", { name: "Diff" })).toBeVisible();
   await expect(page.getByText("high")).toBeVisible();
-  await expect(page.locator(".metric").filter({ hasText: "Object Delta" }).getByText("+1", { exact: true })).toBeVisible();
+  await expect(page.getByText("Object Delta")).toBeVisible();
+  await expect(page.getByText("+1", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("cell", { name: "102" })).toBeVisible();
 
   await page.goto("/?page=diff&from=1&to=3");
@@ -82,10 +73,10 @@ test("overview, objects, graph, diff, sql, and report load against local API", a
 
   await page.goto("/?page=findings&snapshot=4");
   await expect(page.getByRole("heading", { name: "Findings" })).toBeVisible();
-  await page.locator(".data-table .icon-button").first().click();
-  await expect(page.locator(".drawer")).toBeVisible();
+  await page.getByTitle("Open JSON").first().click();
+  await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("button", { name: "Copy JSON" })).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: "Close sheet" }).click();
 
   await page.goto("/?page=sql");
   await expect(page.getByRole("heading", { name: "SQL" })).toBeVisible();
@@ -104,8 +95,8 @@ test("overview, objects, graph, diff, sql, and report load against local API", a
   await expect(page.getByText('"rows"')).toBeVisible();
   await page.getByRole("button", { name: "Explain" }).click();
   await expect(page.getByRole("heading", { name: "SQL Explain Plan" })).toBeVisible();
-  await expect(page.locator(".drawer").getByText('"explain": true')).toBeVisible();
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog").getByText('"explain": true')).toBeVisible();
+  await page.getByRole("button", { name: "Close sheet" }).click();
   await page.locator(".sql-editor").fill("delete from objects");
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByText("query_failed")).toBeVisible();

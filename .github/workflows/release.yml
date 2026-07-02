@@ -1,0 +1,108 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to package, for example v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-13
+            target: x86_64-apple-darwin
+          - os: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/app/pnpm-lock.yaml
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - run: pnpm --dir web/app install --frozen-lockfile
+      - run: pnpm --dir web/app build
+      - name: Build release binary
+        run: PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli --target "${{ matrix.target }}"
+      - name: Smoke binary
+        shell: bash
+        run: |
+          binary="target/${{ matrix.target }}/release/pygco"
+          "$binary" version
+          if strings "$binary" | grep -q "Build web/app/dist before release"; then
+            echo "release binary embedded fallback Web UI"
+            exit 1
+          fi
+          "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-${{ matrix.target }}.sqlite" --rebuild
+      - name: Package archive
+        run: scripts/package_release.sh "${{ steps.version.outputs.version }}" "${{ matrix.target }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: |
+            dist/pygco-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz
+            dist/pygco-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
+
+  publish-draft:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Resolve release tag and version
+        id: release
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - name: Stamp installer and checksums
+        shell: bash
+        run: |
+          sed "s/__PYGCO_VERSION__/${{ steps.release.outputs.version }}/g" scripts/install.sh > dist/install.sh
+          chmod 755 dist/install.sh
+          (cd dist && sha256sum pygco-*.tar.gz > checksums.txt)
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.release.outputs.tag }}" dist/* \
+            --draft \
+            --verify-tag \
+            --title "${{ steps.release.outputs.tag }}" \
+            --notes-file CHANGELOG.md

@@ -3611,30 +3611,50 @@ pub fn suspects(conn: &Connection, options: SuspectsOptions) -> Result<Value> {
                 sid,
                 &options,
                 query_limit,
-                SuspectKind::CacheHeavy,
-                &["%cache%", "%cached%", "%lru%", "%ttl%", "%pool%", "%inmemory%"],
-                "Cache-like types have a high footprint. Check configured bounds and eviction behavior.",
-                "Cache cohorts are pattern-based in this phase and may include legitimate bounded caches.",
+                PatternTypeSuspectSpec {
+                    kind: SuspectKind::CacheHeavy,
+                    patterns: &["%cache%", "%cached%", "%lru%", "%ttl%", "%pool%", "%inmemory%"],
+                    reason: "Cache-like types have a high footprint. Check configured bounds and eviction behavior.",
+                    limitation: "Cache cohorts are pattern-based in this phase and may include legitimate bounded caches.",
+                },
             )?,
             SuspectKind::AsyncBacklog => pattern_type_suspects(
                 conn,
                 sid,
                 &options,
                 query_limit,
-                SuspectKind::AsyncBacklog,
-                &["%asyncio%", "%_asyncio%", "%task%", "%future%", "%async_generator%", "%anyio%"],
-                "Async-related types have a high footprint. Check for pending tasks, futures, callbacks, or unclosed async generators.",
-                "Async state is inferred from type/module names; task state is not available in the current dump format.",
+                PatternTypeSuspectSpec {
+                    kind: SuspectKind::AsyncBacklog,
+                    patterns: &[
+                        "%asyncio%",
+                        "%_asyncio%",
+                        "%task%",
+                        "%future%",
+                        "%async_generator%",
+                        "%anyio%",
+                    ],
+                    reason: "Async-related types have a high footprint. Check for pending tasks, futures, callbacks, or unclosed async generators.",
+                    limitation: "Async state is inferred from type/module names; task state is not available in the current dump format.",
+                },
             )?,
             SuspectKind::ConnectionHeavy => pattern_type_suspects(
                 conn,
                 sid,
                 &options,
                 query_limit,
-                SuspectKind::ConnectionHeavy,
-                &["%connection%", "%connectionpool%", "%redis%", "%socket%", "%poolmanager%", "%httpconnection%"],
-                "Connection or pool types have a high footprint. Check pool sizing and resource lifecycle.",
-                "Connection state is inferred from type/module names; live socket state is not available in the current dump format.",
+                PatternTypeSuspectSpec {
+                    kind: SuspectKind::ConnectionHeavy,
+                    patterns: &[
+                        "%connection%",
+                        "%connectionpool%",
+                        "%redis%",
+                        "%socket%",
+                        "%poolmanager%",
+                        "%httpconnection%",
+                    ],
+                    reason: "Connection or pool types have a high footprint. Check pool sizing and resource lifecycle.",
+                    limitation: "Connection state is inferred from type/module names; live socket state is not available in the current dump format.",
+                },
             )?,
         };
         rows.append(&mut kind_rows);
@@ -3980,21 +4000,30 @@ fn metadata_heavy_suspects(
         snapshot_id,
         options,
         limit,
-        SuspectKind::MetadataHeavy,
-        &[
-            "pydantic%",
-            "pydantic_core%",
-            "fastapi%",
-            "starlette%",
-            "sqlalchemy%",
-            "typing%",
-            "typing_extensions%",
-            "%pydantic%",
-            "%sqlalchemy%",
-        ],
-        "Framework metadata types have a high footprint. This is often steady-state framework cost.",
-        "Single-dump metadata footprint is not leak evidence; compare same-process snapshots for growth.",
+        PatternTypeSuspectSpec {
+            kind: SuspectKind::MetadataHeavy,
+            patterns: &[
+                "pydantic%",
+                "pydantic_core%",
+                "fastapi%",
+                "starlette%",
+                "sqlalchemy%",
+                "typing%",
+                "typing_extensions%",
+                "%pydantic%",
+                "%sqlalchemy%",
+            ],
+            reason: "Framework metadata types have a high footprint. This is often steady-state framework cost.",
+            limitation: "Single-dump metadata footprint is not leak evidence; compare same-process snapshots for growth.",
+        },
     )
+}
+
+struct PatternTypeSuspectSpec<'a> {
+    kind: SuspectKind,
+    patterns: &'a [&'a str],
+    reason: &'a str,
+    limitation: &'a str,
 }
 
 fn pattern_type_suspects(
@@ -4002,13 +4031,11 @@ fn pattern_type_suspects(
     snapshot_id: i64,
     options: &SuspectsOptions,
     limit: i64,
-    kind: SuspectKind,
-    patterns: &[&str],
-    reason: &str,
-    limitation: &str,
+    spec: PatternTypeSuspectSpec<'_>,
 ) -> Result<Vec<Value>> {
     let module_clause = suspect_type_module_clause(options);
-    let pattern_clause = patterns
+    let pattern_clause = spec
+        .patterns
         .iter()
         .enumerate()
         .map(|(index, _)| {
@@ -4045,7 +4072,7 @@ fn pattern_type_suspects(
         ORDER BY ts.shallow_size_sum DESC, COALESCE(trs.reachable_size_sum, 0) DESC, ts.type ASC
         LIMIT ?{}
         ",
-        patterns.len() + 7
+        spec.patterns.len() + 7
     );
     let mut query_params = vec![
         SqlValue::Integer(snapshot_id),
@@ -4056,7 +4083,7 @@ fn pattern_type_suspects(
         SqlValue::Integer(options.min_reachable_size),
     ];
     query_params.extend(
-        patterns
+        spec.patterns
             .iter()
             .map(|pattern| SqlValue::Text(pattern.to_ascii_lowercase())),
     );
@@ -4068,14 +4095,14 @@ fn pattern_type_suspects(
         .into_iter()
         .map(|row| {
             type_suspect(
-                kind,
+                spec.kind,
                 severity_for_size(
                     int_field(&row, "estimated_reachable_size_sum")
                         .max(int_field(&row, "shallow_size_sum")),
                 ),
                 "medium",
-                reason,
-                limitation,
+                spec.reason,
+                spec.limitation,
                 snapshot_id,
                 row,
             )

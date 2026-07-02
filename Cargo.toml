@@ -14,7 +14,13 @@ resolver = "2"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://example.invalid/py-gc-objects-analyze"
+repository = "https://github.com/ivan-94/py-gc-objects-analyze"
+homepage = "https://github.com/ivan-94/py-gc-objects-analyze"
+documentation = "https://github.com/ivan-94/py-gc-objects-analyze/tree/main/docs"
+description = "Local Python GC object memory forensics tooling"
+readme = "README.md"
+keywords = ["python", "gc", "memory", "forensics", "sqlite"]
+categories = ["command-line-utilities", "development-tools::profiling"]
 
 [workspace.dependencies]
 anyhow = "1.0.95"

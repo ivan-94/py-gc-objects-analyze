@@ -1,59 +1,81 @@
-# py-gc-objects-analyze 文档
+# py-gc-objects-analyze Docs
 
-`py-gc-objects-analyze` 是一个本地离线的 Python GC object 内存分析工具。它面向需要排查 Python 服务内存增长、对象持有链、缓存膨胀、流式响应残留、线程/连接资源残留等问题的开发者。
-
-第一版工具遵循三个原则：
-
-- 被分析的 Python 进程只负责低侵入 dump。
-- 所有重计算、索引、聚合、diff 和图遍历都在本地 Rust 工具里完成。
-- Web UI 是本地专业分析界面，不是远程 SaaS。
-
-## 文档入口
-
-- [快速开始](quickstart.md)
-- [Python Producer 接入指南](producer-integration.md)
-- [安装与构建](install.md)
-- [核心概念](concepts.md)
-- [Dump 与 SQLite 数据模型](data-model.md)
-- [Dump 文件格式规范](dump-format.md)
-- [SQLite Schema 规范](sqlite-schema.md)
-- [Local API 规范](api.md)
-- [CLI 规范](cli.md)
-- [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md)
-- [CLI 泄漏排查工作流整改 Spec](specs/2026-07-02-cli-leak-workflow-remediation-spec.md)
-- [Generated CLI Help](generated/cli-help.md)
-- [Generated OpenAPI JSON](generated/openapi.json)
-- [分析模型](analysis-model.md)
-- [Web UI 规范](web-ui.md)
-- [Web UI Walkthrough](web-ui-walkthrough.md)
-- [系统架构](architecture.md)
-- [性能规范](performance.md)
-- [运行安全边界](runtime-safety.md)
-- [Known Limitations](known-limitations.md)
-- [测试策略](testing.md)
-- [POC 反思](poc-retrospective.md)
-- [工程规范](project/engineering-standards.md)
-- [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)
-- [实现蓝图](project/implementation-blueprint.md)
-- [POC 迁移指南](project/poc-migration-guide.md)
-- [References](references/README.md)
-
-## 一句话模型
+`py-gc-objects-analyze` is a local, offline Python GC object memory forensics tool. The target user journey is:
 
 ```text
-Python process
-  -> pygco_dump writes raw JSONL gzip dump
-  -> pygco imports dumps into a fresh temporary SQLite
-  -> pygco CLI / local Web UI analyzes objects, references, sizes, diffs
-  -> SQLite can be deleted after the investigation
+Install pygco
+  -> collect one or more gzip JSONL dumps with pygco-dump
+  -> import into a temporary SQLite analysis database
+  -> investigate through CLI or the local Web UI
 ```
 
-## 已确认的一版边界
+## Start Here
 
-- 命令名：`pygco`
-- Python dump 包发行名：`pygco-dump`
-- Python import 名：`pygco_dump`
-- 主流程：`pygco open dump-a.jsonl.gz dump-b.jsonl.gz`
-- 显式流程：`pygco import dump-a.jsonl.gz dump-b.jsonl.gz -o analysis.sqlite --rebuild` 后 `pygco web analysis.sqlite`
-- 发布期 Web UI 静态资源嵌入 Rust binary。
-- 开发期 Rust API server 与 React dev server 分开运行。
+- [Quickstart](quickstart.md)
+- [Demo transcript](demo.md)
+- [Install and build](install.md)
+- [Python producer integration](producer-integration.md)
+- [Runtime safety](runtime-safety.md)
+- [Known limitations](known-limitations.md)
+- [Troubleshooting](troubleshooting.md)
+- [Release acceptance](release-acceptance.md)
+
+## User Guide
+
+- [Core concepts](concepts.md)
+- [Web UI walkthrough](web-ui-walkthrough.md)
+- [Performance model](performance.md)
+- [Versioning](versioning.md)
+- [Compatibility](compatibility.md)
+- [Testing strategy](testing.md)
+
+## Reference
+
+- [CLI contract](cli.md)
+- [Generated CLI help](generated/cli-help.md)
+- [Local API contract](api.md)
+- [Generated OpenAPI JSON](generated/openapi.json)
+- [Dump format](dump-format.md)
+- [SQLite schema](sqlite-schema.md)
+- [Dump and SQLite data model](data-model.md)
+- [Analysis model](analysis-model.md)
+- [Web UI contract](web-ui.md)
+
+## Developer Docs
+
+- [Architecture](architecture.md)
+- [Engineering standards](project/engineering-standards.md)
+- [Source Manifest guidance](project/source-manifest.md)
+- [Issue triage](triage.md)
+- [Good first issue candidates](good-first-issues.md)
+- [Maintenance](maintenance.md)
+- [Release provenance](release-provenance.md)
+- [Release acceptance](release-acceptance.md)
+- [References](references/README.md)
+
+## Specs And Project Archive
+
+Current specs:
+
+- [Open Source Release Readiness Spec](specs/2026-07-02-open-source-release-readiness-spec.md)
+- [CLI Leak Workflow Remediation Spec](specs/2026-07-02-cli-leak-workflow-remediation-spec.md)
+- [Cache Sessions Spec](specs/2026-07-01-cache-sessions-spec.md)
+
+Project/archive material:
+
+- [CLI diagnostics workbench](cli-diagnostics-workbench.md)
+- [CLI diagnostics technical spec](project/cli-diagnostics-technical-spec.md)
+- [Implementation blueprint](project/implementation-blueprint.md)
+- [POC migration guide](project/poc-migration-guide.md)
+- [POC retrospective](poc-retrospective.md)
+- [Release task list](project/task.md)
+
+## First-Version Boundaries
+
+- Command name: `pygco`
+- Python distribution: `pygco-dump`
+- Python import name: `pygco_dump`
+- Main flow: `pygco open dump-a.jsonl.gz dump-b.jsonl.gz`
+- Explicit flow: `pygco import dump-a.jsonl.gz dump-b.jsonl.gz -o analysis.sqlite --rebuild`, then `pygco web analysis.sqlite`
+- Release binaries embed the React Web UI.
+- Development uses a Rust API server plus a React dev server.

@@ -41,6 +41,8 @@ http://127.0.0.1:<port>/api
 
 `details` 必须保留 machine-readable context；当错误可由用户修正时，`details.next_step` 应给出 Web UI 和下游 Agent 可直接展示的下一步行动。
 
+常见错误场景和人工排查路径见 [Troubleshooting](troubleshooting.md)。
+
 分页：
 
 ```json

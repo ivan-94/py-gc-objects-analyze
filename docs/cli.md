@@ -117,6 +117,8 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 | `20` | query 失败 |
 | `70` | 内部错误 |
 
+常见安装、dump、SQL、Web UI 和缓存清理问题见 [Troubleshooting](troubleshooting.md)。
+
 ## `pygco open`
 
 导入一个或多个本地 dump 或 URL dump，启动本地服务，并按配置打开 Web UI。

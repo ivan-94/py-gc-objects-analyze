@@ -14,6 +14,17 @@ test:
 web:
     pnpm --dir web/app build
 
+python-build:
+    cd python/pygco_dump && python3 -m build
+
+test-install:
+    scripts/test_install.sh
+
+dist version='':
+    pnpm --dir web/app build
+    PYGCO_WEB_DIST="$(pwd)/web/app/dist" cargo build --release -p pygco-cli
+    scripts/package_release.sh {{version}}
+
 fixtures:
     python3 fixtures/generators/generate_golden.py
     python3 fixtures/generators/generate_synthetic.py --all

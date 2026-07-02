@@ -1,10 +1,50 @@
-# 快速开始
+# Quickstart
 
-本文面向第一次使用 `pygco` 排查 Python GC object 内存快照的用户。
+This guide is for a first-time user running a local Python GC object memory investigation.
 
-## 1. 在 Python 服务中开启 dump
+## 1. Install The Tools
 
-业务进程集成 Python producer 包：
+Install `pygco` from GitHub Releases:
+
+```bash
+curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/download/install.sh | sh
+```
+
+Install the Python dump producer in the environment that runs the target process:
+
+```bash
+python -m pip install "pygco-dump[fastapi]"
+```
+
+See [Install and build](install.md) for manual binary install, source builds, upgrades, uninstalls, and release verification.
+
+## 2. Run A Fixture First
+
+Before touching a service, confirm the local analyzer works:
+
+```bash
+pygco open fixtures/golden/tiny-v1.jsonl.gz --no-browser
+```
+
+Open the printed local URL. `pygco open` will:
+
+1. Create a new temporary analysis session.
+2. Import the dump into a fresh SQLite database.
+3. Build indexes and basic analysis data.
+4. Start a local API server and Web UI.
+
+Default sessions live under `PYGCO_HOME`, `XDG_CACHE_HOME/pygco`, or `~/.cache/pygco`:
+
+```text
+<cache-root>/sessions/<timestamp-random>/
+  analysis.sqlite
+  import.log
+  manifest.json
+```
+
+## 3. Add A FastAPI Dump Endpoint
+
+Inside the Python service you want to inspect:
 
 ```python
 from pygco_dump.fastapi import gc_heap_dump_route
@@ -16,45 +56,28 @@ app.add_api_route(
 )
 ```
 
-这个 endpoint 只负责流式导出 gzip JSONL dump，不做聚合、不做分析。
+The endpoint only streams gzip JSONL dumps. It does not aggregate, analyze, redact, authorize, or schedule collection.
 
-FastAPI 只是最小示例。Celery worker、Gunicorn/uWSGI `prefork`、管理命令或 daemon 进程可以直接调用底层 `write_gc_dump()`；多进程 worker 推荐按 PID 触发每个进程各自写 dump。详见 [Python Producer 接入指南](producer-integration.md)。
+Do not expose this endpoint to untrusted users. Dumps can contain sensitive object metadata, and `collect=true` may affect service latency. Read [Runtime safety](runtime-safety.md) and [Python Producer integration](producer-integration.md) before using this against shared or production services.
 
-## 2. 拉取 dump 文件
+FastAPI is the smallest HTTP example. Celery workers, Gunicorn/uWSGI `prefork`, management commands, and daemon processes can call the lower-level `write_gc_dump()` API directly. Multi-process services should collect per-PID dumps when process identity matters.
+
+## 4. Collect Before And After Dumps
 
 ```bash
 curl -o before.jsonl.gz "http://service/debug/gc-heap-dump?collect=false"
 curl -o after.jsonl.gz "http://service/debug/gc-heap-dump?collect=false"
 ```
 
-需要强制 GC 时可以显式加 `collect=true`。默认不建议在高压环境中自动 collect。
+Use `collect=true` only when you intentionally want the target process to run GC before dumping.
 
-## 3. 一条命令打开 Web UI
+## 5. Open The Web UI
 
 ```bash
 pygco open before.jsonl.gz after.jsonl.gz
 ```
 
-`pygco open` 会：
-
-1. 创建一个新的临时分析 session。
-2. 把 dump 导入 fresh SQLite。
-3. 计算基础聚合和必要索引。
-4. 启动本地 API server。
-5. 打开本地 Web UI。
-
-默认 session 存放在用户 cache root 下。解析顺序是 `PYGCO_HOME`、`XDG_CACHE_HOME/pygco`、`~/.cache/pygco`：
-
-```text
-<cache-root>/sessions/<timestamp-random>/
-  analysis.sqlite
-  import.log
-  manifest.json
-```
-
-## 4. 显式导入和 CLI 分析
-
-需要可复现命令或自动化分析时，使用显式流程：
+If you need a reproducible command sequence or automation-friendly output, use the explicit flow:
 
 ```bash
 pygco import before.jsonl.gz after.jsonl.gz -o analysis.sqlite --rebuild
@@ -63,25 +86,23 @@ pygco diff analysis.sqlite --from 1 --to 2
 pygco web analysis.sqlite
 ```
 
-如果 `analysis.sqlite` 已存在，默认报错。使用 `--rebuild` 显式删除并重建。
+If `analysis.sqlite` already exists, `pygco import` fails unless you pass `--rebuild`.
 
-## 5. 推荐排查顺序
+## 6. Investigation Order
 
-1. 看 Overview：确认 object count、edge count、shallow size、top types、top modules。
-2. 看 Diff：确认快照之间哪些 type/module/cohort 增长。
-3. 看 Objects：按 reachable size、shallow size、in edges、out edges 排序。
-4. 看 Object Detail：检查 referents、referrers、局部引用图。
-5. 看 Owner Paths：找可能的持有者链路。
-6. 看 Findings/Leads：把启发式结果当候选线索，不直接当结论。
-7. 用 SQL / idset 做临时验证。
+1. Overview: confirm object count, edge count, shallow size, top types, and top modules.
+2. Diff: identify growing types, modules, cohorts, and object lifecycle confidence.
+3. Objects: sort by reachable size, shallow size, in edges, or out edges.
+4. Object detail: inspect referents, referrers, and local reference graph.
+5. Owner paths: sample bounded retaining or referent paths.
+6. Findings and leads: treat heuristics as candidates, not proof.
+7. SQL and idsets: run temporary read-only validation queries when needed.
 
-## 6. 删除 session
+## 7. Delete Cached Sessions
 
-SQLite 是临时分析产物，用完可以删除：
+SQLite analysis files are temporary. Keep the original dump files, then remove sessions when no longer needed:
 
 ```bash
 pygco sessions list --format table
 rm -rf ~/.cache/pygco/sessions/<session-id>
 ```
-
-保留原始 dump 即可复现导入结果。

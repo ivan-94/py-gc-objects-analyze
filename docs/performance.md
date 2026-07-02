@@ -129,6 +129,20 @@ benchmark 维度：
 - reachability compute time
 - Web API p95 latency
 
+Scheduled and manual benchmark runs are defined in `.github/workflows/benchmarks.yml`. Reports are uploaded as workflow artifacts instead of being committed by default.
+
+Each published benchmark snapshot must name:
+
+- command
+- git revision or release version
+- runner or machine type
+- CPU and memory if known
+- fixture path and generated object/edge counts
+- binary profile (`debug` or `release`)
+- whether reachability was enabled
+
+Web bundle size is reported from `web/app/dist/assets/*` in the benchmark workflow. Treat large changes as review signals, not automatic failures, unless a release gate later defines a fixed budget.
+
 ## Current Benchmark Snapshot
 
 Benchmark inputs:

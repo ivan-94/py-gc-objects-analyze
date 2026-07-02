@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible pygco or pygco-dump bug.
+title: "[Bug]: "
+labels: ["type: bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: pygco version
+      description: Run `pygco version` if the CLI is involved.
+      placeholder: "0.1.0"
+  - type: input
+    id: os
+    attributes:
+      label: OS and architecture
+      placeholder: "macOS 14 arm64, Ubuntu 24.04 x86_64"
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "Python 3.12.4"
+  - type: textarea
+    id: command
+    attributes:
+      label: Command or integration point
+      description: Include the command, endpoint, or producer helper involved.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: dump_shape
+    attributes:
+      label: Dump source shape
+      description: Share high-level shape only. Do not attach private dumps unless they are safe to publish.
+      placeholder: "FastAPI process, two dumps, approx 200 MB gzip each, collect=false, include_repr=false"
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Data safety
+      options:
+        - label: I have not attached private or sensitive dump data.
+          required: true

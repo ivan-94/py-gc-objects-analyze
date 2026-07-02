@@ -118,7 +118,7 @@ export function SqlPage({ snapshotId }: { snapshotId?: number }) {
             </CardHeader>
             <CardContent>
               <Textarea
-                className="min-h-[280px] resize-y font-mono text-sm leading-6"
+                className="sql-editor min-h-[280px] resize-y font-mono text-sm leading-6"
                 spellCheck={false}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -175,7 +175,7 @@ function SavedIdsetsPanel({
           </Button>
           <div className="text-xs text-muted-foreground">{formatNumber(objectCount)} object ids in current result</div>
         </div>
-        <div className="space-y-2">
+        <div className="saved-idset-list space-y-2">
           {idsets.length ? idsets.map((idset) => (
             <div key={idset.idset_id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
               <span className="min-w-0">
@@ -192,9 +192,9 @@ function SavedIdsetsPanel({
 }
 
 function JobStatusPanel({ job }: { job?: JobData }) {
-  if (!job) return <div className="rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">Starting job...</div>;
+  if (!job) return <div className="job-status rounded-lg border border-border bg-background p-3 text-sm text-muted-foreground">Starting job...</div>;
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-3 text-sm">
+    <div className="job-status flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background p-3 text-sm">
       <span className="font-mono text-xs text-muted-foreground">{job.job_id}</span>
       <Badge tone={job.status === "failed" || job.status === "canceled" ? "warn" : "neutral"}>{job.status}</Badge>
       <progress className="h-2 w-40" value={job.progress} max={1} />
@@ -205,7 +205,7 @@ function JobStatusPanel({ job }: { job?: JobData }) {
 
 function SchemaBrowser({ schema, onSelectTable }: { schema?: SchemaSummary; onSelectTable: (table: string) => void }) {
   return (
-    <Card>
+    <Card className="schema-browser">
       <CardHeader>
         <CardTitle>Schema</CardTitle>
       </CardHeader>

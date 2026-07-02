@@ -1,0 +1,52 @@
+name: Release checklist
+description: Track a release candidate through artifact, PyPI, and HAT verification.
+title: "Release: v"
+labels: ["area:release", "priority:p0"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Release version
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: source_manifest
+    attributes:
+      label: Source Manifest
+      description: List spec, changelog, release workflow run, PyPI workflow run, and HAT guide.
+      value: |
+        - Spec:
+        - Changelog:
+        - Release workflow:
+        - PyPI workflow:
+        - HAT guide:
+    validations:
+      required: true
+  - type: checkboxes
+    id: binary_release
+    attributes:
+      label: Binary release
+      options:
+        - label: GitHub Release workflow completed.
+        - label: Draft release contains install.sh, archives, per-archive .sha256 files, and checksums.txt.
+        - label: Downloaded release archive runs pygco version.
+        - label: Downloaded release binary opens the fixture Web UI with --no-browser.
+  - type: checkboxes
+    id: python_release
+    attributes:
+      label: Python release
+      options:
+        - label: TestPyPI rehearsal completed.
+        - label: PyPI publish completed.
+        - label: Clean virtual environment can install pygco-dump[fastapi].
+        - label: FastAPI helper smoke test passed.
+  - type: checkboxes
+    id: acceptance
+    attributes:
+      label: Acceptance
+      options:
+        - label: Linux HAT passed.
+        - label: macOS HAT passed.
+        - label: README, install docs, quickstart, security docs, and known limitations match observed behavior.
+        - label: Release notes include artifacts, checksums, compatibility versions, and known limitations.
