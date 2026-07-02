@@ -475,7 +475,7 @@ Acceptance:
 
 Verification:
 
-- [ ] First lightweight main or PR CI run after the simplification.
+- [x] First lightweight main CI run after the simplification: `28583986094`.
 - [x] Local lightweight equivalent:
   - [x] `cargo test --workspace --lib --bins`
   - [x] `python -m pytest python/pygco_dump`
