@@ -14,24 +14,14 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: build ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            target: x86_64-unknown-linux-gnu
-          - os: macos-13
-            target: x86_64-apple-darwin
-          - os: macos-14
-            target: aarch64-apple-darwin
+  linux-artifact:
+    name: build linux x86_64
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: x86_64-unknown-linux-gnu
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
@@ -52,29 +42,86 @@ jobs:
       - run: pnpm --dir web/app install --frozen-lockfile
       - run: pnpm --dir web/app build
       - name: Build release binary
-        run: PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli --target "${{ matrix.target }}"
+        run: PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli --target x86_64-unknown-linux-gnu
       - name: Smoke binary
         shell: bash
         run: |
-          binary="target/${{ matrix.target }}/release/pygco"
+          binary="target/x86_64-unknown-linux-gnu/release/pygco"
           "$binary" version
           if strings "$binary" | grep -q "Build web/app/dist before release"; then
             echo "release binary embedded fallback Web UI"
             exit 1
           fi
-          "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-${{ matrix.target }}.sqlite" --rebuild
+          "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-x86_64-unknown-linux-gnu.sqlite" --rebuild
       - name: Package archive
-        run: scripts/package_release.sh "${{ steps.version.outputs.version }}" "${{ matrix.target }}"
+        run: scripts/package_release.sh "${{ steps.version.outputs.version }}" x86_64-unknown-linux-gnu
       - uses: actions/upload-artifact@v4
         with:
-          name: release-${{ matrix.target }}
+          name: release-linux
           path: |
-            dist/pygco-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz
-            dist/pygco-${{ steps.version.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
+            dist/pygco-${{ steps.version.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz
+            dist/pygco-${{ steps.version.outputs.version }}-x86_64-unknown-linux-gnu.tar.gz.sha256
+
+  macos-artifacts:
+    name: build macos artifacts
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: web/app/pnpm-lock.yaml
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          fi
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+      - run: pnpm --dir web/app install --frozen-lockfile
+      - run: pnpm --dir web/app build
+      - name: Build, smoke, and package macOS archives
+        shell: bash
+        run: |
+          host="$(rustc -vV | awk '/^host:/ {print $2}')"
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli --target "$target"
+            binary="target/$target/release/pygco"
+            file "$binary"
+            if strings "$binary" | grep -q "Build web/app/dist before release"; then
+              echo "release binary embedded fallback Web UI for $target"
+              exit 1
+            fi
+            if [ "$target" = "$host" ]; then
+              "$binary" version
+              "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-$target.sqlite" --rebuild
+            else
+              echo "built cross-target $target on host $host; runtime smoke is covered by HAT"
+            fi
+            scripts/package_release.sh "${{ steps.version.outputs.version }}" "$target"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-macos
+          path: |
+            dist/pygco-${{ steps.version.outputs.version }}-aarch64-apple-darwin.tar.gz
+            dist/pygco-${{ steps.version.outputs.version }}-aarch64-apple-darwin.tar.gz.sha256
+            dist/pygco-${{ steps.version.outputs.version }}-x86_64-apple-darwin.tar.gz
+            dist/pygco-${{ steps.version.outputs.version }}-x86_64-apple-darwin.tar.gz.sha256
 
   publish-draft:
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      - linux-artifact
+      - macos-artifacts
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
