@@ -47,7 +47,7 @@
 ### Verification Evidence
 
 - Reviewed current README, docs, CI workflow, package metadata, release checklist, testing strategy, architecture docs, and implementation entrypoints with `rg`, `sed`, `find`, and `git status`.
-- Updated release-facing documentation, metadata, governance files, installer/package scripts, CI, binary release workflow, and Python publishing workflow.
+- Updated release-facing documentation, metadata, governance files, installer/package scripts, lightweight unit-test CI, binary release workflow, and Python publishing workflow.
 - Re-ran the full local regression set on 2026-07-02 after adding screenshots, demo docs, troubleshooting links, and release notes verification guidance.
 - Local verification completed so far:
   - `python3 scripts/check_docs_commands.py`
@@ -76,6 +76,7 @@
   - Pull request CI run `28582123395` passed on a Dependabot PR.
   - After maintainer feedback, PR/push CI was simplified to unit checks only; docs command, release artifact, Web E2E, and benchmark checks stay in local release preparation or dedicated release/benchmark workflows.
   - Rust PR/push CI uses `cargo test --workspace --lib --bins` so integration/contract tests do not block routine PRs.
+  - GitHub Actions CI run `28587516812` passed on commit `a81fcdf` with only `rust-unit`, `python-unit`, and `web-unit`.
   - Manual benchmark workflow run `28581056797` passed.
   - GitHub Release workflow run `28582024816` passed for tag `v0.1.0-rc.2` and produced a draft release.
   - `gh release download v0.1.0-rc.2 --repo ivan-94/py-gc-objects-analyze --dir .scratch/rc2` downloaded `install.sh`, `checksums.txt`, three target archives, and their per-archive `.sha256` files.
@@ -92,11 +93,17 @@
   - Clean local-wheel FastAPI helper smoke produced an `application/gzip` dump stream with metadata start/end records.
   - `publish-python` workflow dispatch run `28586504894` built `pygco_dump-0.1.0.tar.gz` and `pygco_dump-0.1.0-py3-none-any.whl`, passed `twine check`, and tested the built wheel.
   - The same TestPyPI publish rehearsal failed at the upload step with `invalid-publisher`; the reported trusted publisher claim was `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
+  - Release workflow dry run `28587055092` completed with `tag=dry-run`, built release artifacts/notes, and skipped draft release creation.
+  - Release workflow dry run `28587529503` completed with `tag=dry-run-attest` on commit `a81fcdf`; `Attest release artifacts` created provenance for 8 subjects.
+  - `gh attestation verify .scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz --repo ivan-94/py-gc-objects-analyze --format json` verified the Linux dry-run archive against `release.yml@refs/heads/main`, commit `a81fcdf`, run `28587529503`, and SLSA provenance subjects for all release assets.
+  - `sed 's#dist/##' pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz.sha256 | shasum -a 256 -c -` passed for the downloaded Linux dry-run archive.
+  - Final local unit-only verification after documentation evidence updates: `cargo test --workspace --lib --bins`, `. .scratch/build-venv/bin/activate && python -m pytest python/pygco_dump`, and `pnpm --dir web/app test`.
 - Chrome DOM verification was run without screenshots:
-  - Repository page rendered README install/quickstart content and license/contributing/security entry links.
+  - Repository page rendered README install/quickstart content, `releases/latest/download/install.sh`, the `pygco-dump[fastapi]` install command, and license/contributing/security entry links.
+  - Rendered docs pages for install, quickstart, runtime safety, troubleshooting, and contributing were reachable from GitHub and showed the expected section headings/content.
   - Issue template chooser rendered bug, memory investigation feedback, documentation issue, feature request, and release checklist templates.
   - Draft release page rendered as `v0.1.0-rc.2`; GitHub kept the full asset list in a loading state during DOM inspection, so complete asset evidence comes from `gh release download` and checksum verification.
-  - Local Web UI opened from the HAT `pygco web: http://127.0.0.1:.../` URL and rendered Overview/navigation content.
+  - Local Web UI opened from the HAT `pygco web: http://127.0.0.1:3776/` URL and rendered Overview, Objects, Object Graph, Diff, SQL, and Report content without screenshots.
 - GitHub labels and tracker issues were created for all P0/P1 slices.
 
 ### Open Questions / Risks
@@ -104,7 +111,7 @@
 - The GitHub owner/repository URL is set to `https://github.com/ivan-94/py-gc-objects-analyze`.
 - The implemented P0 binary target matrix is Linux x86_64, macOS x86_64, and macOS Apple Silicon. The `v0.1.0-rc.3` tag run produced all three; macOS x86_64 has a Rosetta runtime smoke but a physical Intel Mac remains useful before non-draft publication.
 - PyPI project ownership and Trusted Publishing configuration happen outside the repository and must be completed by a maintainer.
-- Release artifact signing and SLSA provenance are P1/P2 hardening, not P0 blockers, but missing checksums are a P0 blocker.
+- Release artifact signing and SBOM generation remain optional hardening, not P0 blockers. Checksums are a P0 blocker, and GitHub artifact attestations are now validated for future release workflow runs.
 - Current external preflight status:
   - `gh` is authenticated as `ivan-94`.
   - `main` is pushed and protected by CI workflow definitions.
@@ -144,7 +151,7 @@ The repository is P0 release-ready when a maintainer can tag a release and a new
 - Make the project understandable from the root README without requiring prior context.
 - Provide a working binary release path for `pygco` that embeds the real Web UI assets.
 - Publish `pygco-dump` as a real Python package with complete package metadata.
-- Turn CI into a release gate that checks docs, Rust, Python, Web UI, and packaged artifacts.
+- Keep routine PR/push CI as fast unit-test feedback, with release-critical docs, Web UI, and packaged artifact checks in dedicated release preparation workflows.
 - Add minimum open source governance and security reporting material.
 - Preserve document-driven development and TDD expectations.
 - Split the work into slices that can become independently grabbable issues.
@@ -167,7 +174,7 @@ P0 is the minimum credible open source launch. P1 is post-launch trust, document
 | --- | --- | --- |
 | P0 | Identity and metadata | The repository presents a coherent open source project with correct package metadata. |
 | P0 | Install and release | Users can install `pygco` from GitHub Releases and `pygco-dump` from PyPI. |
-| P0 | CI as gate | Release-critical docs, builds, tests, and artifact smoke checks run in automation. |
+| P0 | CI and release gates | Routine PR/push CI runs unit tests only; dedicated release workflows cover artifact and packaged Web UI checks. |
 | P0 | Governance and safety | License, contributing, security, issue/PR templates, and safety docs exist. |
 | P0 | Clean-machine acceptance | A documented acceptance script proves the new-user path. |
 | P1 | Docs depth | Screenshots, troubleshooting, compatibility details, and examples improve confidence. |
@@ -414,11 +421,11 @@ Acceptance:
 
 Verification:
 
-- [ ] `workflow_dispatch` dry run on a non-release tag or branch.
+- [x] `workflow_dispatch` dry run on a non-release tag or branch.
 - [x] Download uploaded artifacts from the draft release and run checksum/runtime smoke checks.
 - [x] Optional Chrome DOM check: inspect the draft GitHub Release page and confirm the draft tag/release page renders. Full asset list was verified through `gh release download` because GitHub kept the asset widget loading in Chrome.
 
-External note: tag `v0.1.0-rc.2` created a successful draft release. `workflow_dispatch` rehearsal remains optional and unchecked.
+External note: tag `v0.1.0-rc.3` created a successful draft release. Workflow dispatch dry run `28587055092` completed with `tag=dry-run`, built artifacts and release notes, and skipped draft release creation.
 
 ### P0-S6. PyPI Release Workflow for `pygco-dump`
 
@@ -490,6 +497,7 @@ Acceptance:
 Verification:
 
 - [x] First lightweight main CI run after the simplification: `28583986094`.
+- [x] Latest lightweight main CI confirmation on commit `a81fcdf`: run `28587516812`.
 - [x] Local lightweight equivalent:
   - [x] `cargo test --workspace --lib --bins`
   - [x] `python -m pytest python/pygco_dump`
@@ -565,7 +573,7 @@ Verification:
 
 - [x] `python3 scripts/check_docs_commands.py`
 - [x] Manual link/navigation review.
-- [ ] Optional Chrome check: open rendered docs or a docs preview and verify the navigation path from README to install, quickstart, safety, troubleshooting, and contributor docs.
+- [x] Optional Chrome check: open rendered docs or a docs preview and verify the navigation path from README to install, quickstart, safety, troubleshooting, and contributor docs.
 
 ### P1-S2. Screenshots, Demo, and Web UI Walkthrough
 
@@ -595,7 +603,7 @@ Verification:
 
 - [x] Playwright screenshot generation command or documented manual screenshot procedure.
 - [x] Manual visual review.
-- [ ] Optional Chrome check: inspect generated screenshots or the running Web UI and capture evidence for Overview, Objects, Graph, Diff, SQL/Idsets, and Report.
+- [x] Optional Chrome check: inspect generated screenshots or the running Web UI and capture evidence for Overview, Objects, Graph, Diff, SQL/Idsets, and Report.
 
 ### P1-S3. Troubleshooting and Safety Deepening
 
@@ -686,9 +694,9 @@ Acceptance:
 
 Verification:
 
-- [ ] Release dry run with signed or attested artifacts.
+- [x] Release dry run with signed or attested artifacts.
 
-External note: signing or attestation is intentionally deferred until after the basic GitHub Release dry run.
+External note: workflow dispatch run `28587529503` completed with `tag=dry-run-attest`; `Attest release artifacts` created provenance for 8 subjects, and `gh attestation verify` passed for the Linux archive. Existing `v0.1.0-rc.3` draft release assets predate this attestation change and remain checksum-verified only.
 
 ### P1-S6. Contributor Experience and Issue Triage
 
@@ -805,12 +813,12 @@ P0 is done when:
 - [x] License, contributing, security, templates, package metadata, and changelog are present.
 - [x] GitHub Release workflow can produce installer, archives, checksums, and draft release notes.
 - [ ] PyPI workflow can publish `pygco-dump` through a rehearsed path. Requires TestPyPI/PyPI Trusted Publishing setup and rehearsal.
-- [x] PR/push CI gates lightweight docs and unit checks; release and benchmark workflows gate heavyweight artifact, Web E2E, and performance checks.
+- [x] PR/push CI gates unit checks only; release preparation and benchmark workflows gate heavyweight artifact, docs freshness, Web E2E, and performance checks.
 - [x] Clean-machine acceptance passes on the supported P0 binary targets.
 
 P1 is done when:
 
 - [x] Docs navigation, screenshots, troubleshooting, and safety material are strong enough for self-service users.
 - [x] Dependency automation and triage workflows are active.
-- [ ] Release artifacts have stronger verification or provenance than basic checksums.
+- [x] Release artifacts have stronger verification or provenance than basic checksums.
 - [x] Performance claims are reproducible from documented benchmark commands and environment metadata.

@@ -15,10 +15,14 @@
 - Release workflows: `.github/workflows/release.yml`, `.github/workflows/release-acceptance.yml`
 - Release scripts: `scripts/install.sh`, `scripts/package_release.sh`, `scripts/render_release_notes.py`
 - GitHub Release workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28584497200
+- Attestation release dry-run workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28587529503
 - Linux release acceptance workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586150834
 - TestPyPI publish rehearsal workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586504894
+- Lightweight unit CI confirmation run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28587516812
 - GitHub Release tag: `v0.1.0-rc.3`
 - GitHub Release URL: https://github.com/ivan-94/py-gc-objects-analyze/releases/tag/untagged-d5226fc5b2c3a3d763e8
+- GitHub repository page: https://github.com/ivan-94/py-gc-objects-analyze
+- Local Web UI URL inspected through Chrome: `http://127.0.0.1:3776/`
 
 ### Produced artifacts
 
@@ -56,7 +60,12 @@
 - macOS x86_64 archive ran `pygco version`, `import`, and `summary` under Rosetta on Apple Silicon.
 - FastAPI helper was installed from the local wheel in a clean venv and produced an `application/gzip` dump stream with `metadata/start` and `metadata/end` records.
 - TestPyPI publish rehearsal run `28586504894` built the wheel and sdist, passed `twine check`, and tested the built wheel; upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
-- Chrome DOM verification was performed without screenshots against the local Web UI; the Overview navigation and page content rendered from the printed local URL.
+- Lightweight CI run `28587516812` passed on commit `a81fcdf` with only `rust-unit`, `python-unit`, and `web-unit`.
+- Release dry-run `28587529503` passed with `tag=dry-run-attest`; `Attest release artifacts` created provenance for 8 subjects, and `gh attestation verify` passed for `.scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz`.
+- Chrome DOM verification was performed without screenshots:
+  - GitHub repository page rendered README install/quickstart content, `releases/latest/download/install.sh`, `pygco-dump[fastapi]`, and license/contributing/security links.
+  - Rendered install, quickstart, runtime safety, troubleshooting, and contributing docs were reachable and showed expected headings/content.
+  - Local Web UI rendered Overview, Objects, Object Graph, Diff, SQL, and Report pages from the printed local URL.
 - `python3 scripts/check_docs_commands.py`, workflow YAML parsing, and `git diff --check` passed after the workflow/report updates.
 
 ### Open questions / risks
@@ -64,7 +73,7 @@
 - HAT-7 is still open: configure the TestPyPI trusted publisher for owner `ivan-94`, repository `py-gc-objects-analyze`, workflow `publish-python.yml`, environment `testpypi`, then rerun `publish-python` with `target=testpypi` and install `pygco-dump[fastapi]` from TestPyPI.
 - The final public `curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/download/install.sh | sh` path must be checked after publishing a non-draft release.
 - The macOS x86_64 archive was runtime-smoked under Rosetta, not on a physical Intel Mac.
-- Release artifact signing or GitHub artifact attestation remains P1 hardening beyond the current checksum verification.
+- Release artifact signing or GitHub artifact attestation remains P1 hardening for the already-created `v0.1.0-rc.3` draft assets; later release workflow dry run `28587529503` validated attestations for future tags.
 - GitHub runner annotations note that `actions/checkout@v4` and `actions/upload-artifact@v4` are being forced to Node.js 24 because Node.js 20 is deprecated; Dependabot has opened action update PRs.
 
 ## Environment
@@ -107,6 +116,9 @@ arch -x86_64 .scratch/hat-rc3-macos-x86_64/pygco import fixtures/golden/tiny-v1.
 gh workflow run release-acceptance.yml -f tag=v0.1.0-rc.3 --ref main
 gh run watch 28586150834 --exit-status
 gh run download 28586150834 --name release-acceptance-linux --dir .scratch/hat-linux-rc3
+gh workflow run release.yml -f tag=dry-run-attest -f dry_run=true --ref main
+gh run watch 28587529503 --exit-status
+gh attestation verify .scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz --repo ivan-94/py-gc-objects-analyze --format json
 ```
 
 ## Result

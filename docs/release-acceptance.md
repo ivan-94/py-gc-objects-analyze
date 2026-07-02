@@ -45,6 +45,16 @@ gh workflow run release.yml -f tag=dry-run -f dry_run=true
 
 The dry run still builds the Web UI, release binaries, archives, checksums, installer, and release notes. It skips only the final `gh release create` step.
 
+The release workflow also creates GitHub artifact attestations for release assets. To rehearse that path before a real tag, use a distinct dry-run tag value and verify at least one downloaded workflow artifact:
+
+```bash
+gh workflow run release.yml -f tag=dry-run-attest -f dry_run=true
+gh run watch <run-id> --exit-status
+gh attestation verify "pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz" --repo ivan-94/py-gc-objects-analyze
+```
+
+The 2026-07-02 attestation dry run `28587529503` passed on commit `a81fcdf` and verified the Linux archive against `release.yml@refs/heads/main`.
+
 ## PyPI Trusted Publishing Setup
 
 Before HAT can check the TestPyPI/PyPI install path, configure a trusted publisher on the package index. Follow the official [PyPI Trusted Publishers guide](https://docs.pypi.org/trusted-publishers/) and use these claims from `.github/workflows/publish-python.yml`:

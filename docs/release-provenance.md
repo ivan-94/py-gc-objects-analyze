@@ -39,11 +39,12 @@ gh attestation verify "pygco-0.1.0-x86_64-unknown-linux-gnu.tar.gz" --repo ivan-
 
 Checksums prove the downloaded archive bytes match the release checksum. Attestations add a GitHub-signed link between the artifact digest, repository, workflow identity, and build run. They do not replace local runtime HAT or guarantee that the tool is free of vulnerabilities.
 
+The 2026-07-02 dry run `28587529503` verified this path with `tag=dry-run-attest`. GitHub created provenance for `install.sh`, `checksums.txt`, all three target archives, and their per-archive `.sha256` files. `gh attestation verify` passed for the Linux archive and linked it to `release.yml@refs/heads/main`, commit `a81fcdf`, and workflow dispatch run `28587529503`.
+
 ## Remaining Hardening Options
 
 Evaluate these after the first release candidate:
 
-- SLSA provenance,
 - SBOM generation,
 - pinned build toolchains through `rust-toolchain.toml` and package-manager metadata.
 
