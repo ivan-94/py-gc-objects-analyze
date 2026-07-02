@@ -38,7 +38,7 @@ tempfile = "3.16.0"
 thiserror = "2.0.11"
 tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread", "signal"] }
 tower = { version = "0.5.2", features = ["util"] }
-tower-http = { version = "0.6.2", features = ["fs", "trace"] }
+tower-http = { version = "0.7.0", features = ["fs", "trace"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 utoipa = { version = "5.3.1", features = ["axum_extras"] }
