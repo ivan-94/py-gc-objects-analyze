@@ -70,6 +70,8 @@ Retry run `28589579759` produced the same result: build, `twine check`, built-wh
 
 After configuring the TestPyPI pending trusted publisher, run `28592147240` published `pygco-dump 0.1.0` to TestPyPI successfully. The production PyPI publisher is still a separate maintainer setup step before the non-draft release.
 
+`publish-python.yml` is intentionally `workflow_dispatch` only. Publish `pygco-dump` to PyPI explicitly before making the GitHub Release public; publishing a GitHub Release should not retry a package version that already exists on PyPI.
+
 For TestPyPI install rehearsals, install runtime dependencies from PyPI first, then install the TestPyPI wheel with `--no-deps`:
 
 ```bash
