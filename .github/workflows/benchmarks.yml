@@ -39,7 +39,7 @@ jobs:
             echo
             du -h web/app/dist/assets/*
           } > benches/reports/web-bundle-size.md
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: benchmark-reports
           path: benches/reports/*

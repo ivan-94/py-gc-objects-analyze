@@ -55,7 +55,7 @@ jobs:
           "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-x86_64-unknown-linux-gnu.sqlite" --rebuild
       - name: Package archive
         run: scripts/package_release.sh "${{ steps.version.outputs.version }}" x86_64-unknown-linux-gnu
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-linux
           path: |
@@ -108,7 +108,7 @@ jobs:
             fi
             scripts/package_release.sh "${{ steps.version.outputs.version }}" "$target"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-macos
           path: |

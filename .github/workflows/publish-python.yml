@@ -42,7 +42,7 @@ jobs:
           assert callable(write_gc_dump)
           assert callable(gc_heap_dump_route)
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: pygco-dump-dist
           path: python/pygco_dump/dist/*
