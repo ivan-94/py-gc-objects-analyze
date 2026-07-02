@@ -1,13 +1,5 @@
 # 安装与构建
 
-## Source Manifest
-
-- Root project overview: `README.md`
-- CLI contract: `docs/cli.md`
-- Web build architecture: `docs/architecture.md`
-- Python package metadata: `python/pygco_dump/pyproject.toml`
-- Release checklist: `task.md`
-
 ## Prerequisites
 
 - Rust stable toolchain.

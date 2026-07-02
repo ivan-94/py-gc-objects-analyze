@@ -69,13 +69,24 @@ pub fn cache_root() -> anyhow::Result<PathBuf> {
     Ok(home.join(".cache").join("pygco"))
 }
 
+#[allow(dead_code)]
 pub fn write_manifest(
     paths: &SessionPaths,
     dumps: &[PathBuf],
     summary: &ImportSummary,
     options: &ImportOptions,
 ) -> anyhow::Result<()> {
-    let manifest = manifest_value(paths, dumps, summary, options);
+    write_manifest_with_fetched_sources(paths, dumps, summary, options, &[])
+}
+
+pub fn write_manifest_with_fetched_sources(
+    paths: &SessionPaths,
+    dumps: &[PathBuf],
+    summary: &ImportSummary,
+    options: &ImportOptions,
+    fetched_sources: &[Value],
+) -> anyhow::Result<()> {
+    let manifest = manifest_value(paths, dumps, summary, options, fetched_sources);
     fs::write(
         &paths.manifest_path,
         serde_json::to_string_pretty(&manifest)?,
@@ -117,6 +128,7 @@ fn manifest_value(
     dumps: &[PathBuf],
     summary: &ImportSummary,
     options: &ImportOptions,
+    fetched_sources: &[Value],
 ) -> Value {
     let created_at = Utc::now().to_rfc3339();
     json!({
@@ -130,6 +142,7 @@ fn manifest_value(
         "database_path": path_string(&paths.database_path),
         "import_log_path": path_string(&paths.import_log_path),
         "source_dumps": dumps.iter().map(path_string).collect::<Vec<_>>(),
+        "fetched_sources": fetched_sources,
         "import_options": {
             "reachability_mode": format!("{:?}", options.reachability_mode).to_ascii_lowercase(),
             "profile": options.profile,

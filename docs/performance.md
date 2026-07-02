@@ -131,7 +131,7 @@ benchmark 维度：
 
 ## Current Benchmark Snapshot
 
-Source Manifest:
+Benchmark inputs:
 
 - Fixture generator: `fixtures/generators/generate_synthetic.py --all`
 - Import report: `benches/reports/medium-import.json`

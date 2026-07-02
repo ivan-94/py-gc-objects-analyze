@@ -7,10 +7,12 @@ from pathlib import Path
 COMMANDS = [
     [],
     ["open"],
+    ["fetch"],
     ["import"],
     ["sessions"],
     ["sessions", "list"],
     ["summary"],
+    ["overview"],
     ["objects"],
     ["object"],
     ["edges"],
@@ -19,6 +21,7 @@ COMMANDS = [
     ["diff-objects"],
     ["findings"],
     ["suspects"],
+    ["container"],
     ["idset"],
     ["sql"],
     ["schema"],
@@ -40,12 +43,6 @@ def main() -> None:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     sections = [
         "# Generated CLI Help",
-        "",
-        "## Source Manifest",
-        "",
-        f"- Generator: `scripts/generate_cli_docs.py --pygco {args.pygco}`",
-        "- Clap source: `crates/pygco-cli/src/main.rs`",
-        "- Contract: `docs/cli.md`",
         "",
         "Do not edit command help text in this file by hand; regenerate it from the binary.",
         "",

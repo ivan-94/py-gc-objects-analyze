@@ -11,6 +11,7 @@
 ## 文档入口
 
 - [快速开始](quickstart.md)
+- [Python Producer 接入指南](producer-integration.md)
 - [安装与构建](install.md)
 - [核心概念](concepts.md)
 - [Dump 与 SQLite 数据模型](data-model.md)
@@ -19,6 +20,7 @@
 - [Local API 规范](api.md)
 - [CLI 规范](cli.md)
 - [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md)
+- [CLI 泄漏排查工作流整改 Spec](specs/2026-07-02-cli-leak-workflow-remediation-spec.md)
 - [Generated CLI Help](generated/cli-help.md)
 - [Generated OpenAPI JSON](generated/openapi.json)
 - [分析模型](analysis-model.md)
@@ -34,7 +36,6 @@
 - [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)
 - [实现蓝图](project/implementation-blueprint.md)
 - [POC 迁移指南](project/poc-migration-guide.md)
-- [Source Manifest](project/source-manifest.md)
 - [References](references/README.md)
 
 ## 一句话模型

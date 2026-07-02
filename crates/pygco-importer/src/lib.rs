@@ -78,6 +78,32 @@ pub struct SnapshotImportSummary {
 pub struct ProfileEvent {
     pub phase: String,
     pub elapsed_ms: u128,
+    pub wall_time_ms: u128,
+    pub self_time_ms: u128,
+    pub nested: bool,
+    pub snapshot_id: Option<i64>,
+    pub phase_kind: String,
+}
+
+impl ProfileEvent {
+    fn new(
+        phase: impl Into<String>,
+        wall_time_ms: u128,
+        self_time_ms: u128,
+        nested: bool,
+        snapshot_id: Option<i64>,
+        phase_kind: impl Into<String>,
+    ) -> Self {
+        Self {
+            phase: phase.into(),
+            elapsed_ms: wall_time_ms,
+            wall_time_ms,
+            self_time_ms,
+            nested,
+            snapshot_id,
+            phase_kind: phase_kind.into(),
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -156,19 +182,30 @@ fn import_to_tmp(
     for input in inputs {
         let started = Instant::now();
         let (summary, events) = import_one(&conn, input, options, &rules)?;
-        profile.push(ProfileEvent {
-            phase: format!("import:{}", input.display()),
-            elapsed_ms: started.elapsed().as_millis(),
-        });
+        let wall_time_ms = started.elapsed().as_millis();
+        let nested_time_ms = events.iter().map(|event| event.wall_time_ms).sum::<u128>();
+        profile.push(ProfileEvent::new(
+            format!("import:{}", input.display()),
+            wall_time_ms,
+            wall_time_ms.saturating_sub(nested_time_ms),
+            false,
+            Some(summary.snapshot_id),
+            "snapshot_import",
+        ));
         profile.extend(events);
         snapshots.push(summary);
     }
     let started = Instant::now();
     create_indexes(&conn)?;
-    profile.push(ProfileEvent {
-        phase: "build_indexes".to_owned(),
-        elapsed_ms: started.elapsed().as_millis(),
-    });
+    let elapsed = started.elapsed().as_millis();
+    profile.push(ProfileEvent::new(
+        "build_indexes",
+        elapsed,
+        elapsed,
+        false,
+        None,
+        "build_indexes",
+    ));
     if matches!(options.reachability_mode, ReachabilityMode::Full) {
         let started = Instant::now();
         for snapshot in &snapshots {
@@ -190,27 +227,37 @@ fn import_to_tmp(
                 )?;
             }
         }
-        profile.push(ProfileEvent {
-            phase: "reachability".to_owned(),
-            elapsed_ms: started.elapsed().as_millis(),
-        });
+        let elapsed = started.elapsed().as_millis();
+        profile.push(ProfileEvent::new(
+            "reachability",
+            elapsed,
+            elapsed,
+            false,
+            None,
+            "reachability",
+        ));
     }
     let started = Instant::now();
     for snapshot in &snapshots {
         refresh_object_list_metrics(&conn, snapshot.snapshot_id, options.reachability_params)?;
     }
-    profile.push(ProfileEvent {
-        phase: "object_list_metrics".to_owned(),
-        elapsed_ms: started.elapsed().as_millis(),
-    });
+    let elapsed = started.elapsed().as_millis();
+    profile.push(ProfileEvent::new(
+        "object_list_metrics",
+        elapsed,
+        elapsed,
+        false,
+        None,
+        "object_list_metrics",
+    ));
     let started = Instant::now();
     for snapshot in &snapshots {
         refresh_findings(&conn, snapshot.snapshot_id)?;
     }
-    profile.push(ProfileEvent {
-        phase: "findings".to_owned(),
-        elapsed_ms: started.elapsed().as_millis(),
-    });
+    let elapsed = started.elapsed().as_millis();
+    profile.push(ProfileEvent::new(
+        "findings", elapsed, elapsed, false, None, "findings",
+    ));
     finalize_pragmas(&conn)?;
     Ok(ImportSummary {
         output: output.to_path_buf(),
@@ -352,6 +399,44 @@ fn import_one(
             "warn",
             "reachability_unavailable",
             "Dump metadata says include_referents=false; reachable size is unavailable.",
+            json!({ "source_uri": source_uri }),
+        )?;
+    }
+    if !start.collect_before_dump {
+        insert_warning(
+            conn,
+            Some(snapshot_id),
+            "warn",
+            "collect_before_dump_false",
+            "Dump was captured without forcing GC; orphan-retained candidates may include GC-pending garbage.",
+            json!({ "source_uri": source_uri }),
+        )?;
+    }
+    if !start.include_repr {
+        insert_warning(
+            conn,
+            Some(snapshot_id),
+            "info",
+            "repr_unavailable",
+            "Dump metadata says include_repr=false; string contents, repr snippets, and some dict-key clues are unavailable.",
+            json!({ "source_uri": source_uri }),
+        )?;
+    }
+    insert_warning(
+        conn,
+        Some(snapshot_id),
+        "info",
+        "edge_labels_unavailable",
+        "Current dump format has referent edges but no field names, dict keys, list indexes, or local variable names.",
+        json!({ "source_uri": source_uri }),
+    )?;
+    if !start.include_referent_stubs {
+        insert_warning(
+            conn,
+            Some(snapshot_id),
+            "info",
+            "referent_stubs_unavailable",
+            "Dump metadata says include_referent_stubs=false; missing referents may reduce graph completeness.",
             json!({ "source_uri": source_uri }),
         )?;
     }
@@ -737,9 +822,15 @@ impl ImportTimings {
             ("build_stats", self.build_stats_ms),
         ]
         .into_iter()
-        .map(|(phase, elapsed_ms)| ProfileEvent {
-            phase: format!("snapshot:{snapshot_id}:{phase}"),
-            elapsed_ms,
+        .map(|(phase, elapsed_ms)| {
+            ProfileEvent::new(
+                format!("snapshot:{snapshot_id}:{phase}"),
+                elapsed_ms,
+                elapsed_ms,
+                true,
+                Some(snapshot_id),
+                phase,
+            )
         })
         .collect()
     }

@@ -1,6 +1,7 @@
 use std::{
     fs::{self, File},
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, Read, Write},
+    net::TcpListener,
     path::{Path, PathBuf},
     process::{Command, Output, Stdio},
     sync::mpsc,
@@ -8,6 +9,7 @@ use std::{
 };
 
 use flate2::{write::GzEncoder, Compression};
+use rusqlite::Connection;
 use serde_json::Value;
 use tempfile::{tempdir, TempDir};
 
@@ -320,6 +322,256 @@ fn import_db(fixtures: &[&str]) -> (TempDir, PathBuf) {
         fixtures.len()
     );
     (dir, db)
+}
+
+fn legacy_db_without_object_list_metrics() -> (TempDir, PathBuf) {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("legacy.sqlite");
+    let conn = Connection::open(&db).unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE snapshots (
+          snapshot_id INTEGER PRIMARY KEY,
+          source_uri TEXT NOT NULL,
+          source_basename TEXT NOT NULL,
+          dump_sha256 TEXT NOT NULL,
+          dump_format TEXT NOT NULL,
+          dump_format_version INTEGER NOT NULL,
+          producer TEXT NOT NULL,
+          producer_version TEXT NOT NULL,
+          producer_run_id TEXT,
+          dump_sequence INTEGER,
+          process_started_at TEXT,
+          host_id TEXT,
+          container_id TEXT,
+          pid INTEGER,
+          python_version TEXT,
+          platform TEXT,
+          created_at TEXT,
+          imported_at TEXT NOT NULL,
+          import_options_json TEXT NOT NULL,
+          object_count INTEGER NOT NULL DEFAULT 0,
+          edge_count INTEGER NOT NULL DEFAULT 0,
+          stub_count INTEGER NOT NULL DEFAULT 0,
+          missing_referent_count INTEGER NOT NULL DEFAULT 0,
+          shallow_size_sum INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE objects (
+          snapshot_id INTEGER NOT NULL,
+          object_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          module TEXT NOT NULL,
+          qualname TEXT NOT NULL,
+          shallow_size INTEGER,
+          gc_tracked INTEGER,
+          stub INTEGER NOT NULL DEFAULT 0,
+          repr TEXT,
+          PRIMARY KEY (snapshot_id, object_id)
+        );
+        CREATE TABLE edges (
+          snapshot_id INTEGER NOT NULL,
+          from_id INTEGER NOT NULL,
+          edge_index INTEGER NOT NULL,
+          to_id INTEGER NOT NULL,
+          PRIMARY KEY (snapshot_id, from_id, edge_index)
+        );
+        CREATE TABLE type_stats (
+          snapshot_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          module TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          shallow_size_sum INTEGER NOT NULL,
+          in_edges INTEGER NOT NULL,
+          out_edges INTEGER NOT NULL,
+          stub_count INTEGER NOT NULL,
+          PRIMARY KEY (snapshot_id, type)
+        );
+        CREATE TABLE module_stats (
+          snapshot_id INTEGER NOT NULL,
+          module TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          shallow_size_sum INTEGER NOT NULL,
+          in_edges INTEGER NOT NULL,
+          out_edges INTEGER NOT NULL,
+          PRIMARY KEY (snapshot_id, module)
+        );
+        CREATE TABLE cohort_stats (
+          snapshot_id INTEGER NOT NULL,
+          cohort TEXT NOT NULL,
+          count INTEGER NOT NULL,
+          shallow_size_sum INTEGER NOT NULL,
+          type_count INTEGER NOT NULL,
+          details_json TEXT NOT NULL,
+          rules_version TEXT NOT NULL,
+          PRIMARY KEY (snapshot_id, cohort)
+        );
+        CREATE TABLE object_reachability (
+          snapshot_id INTEGER NOT NULL,
+          object_id INTEGER NOT NULL,
+          algorithm_version INTEGER NOT NULL,
+          direction TEXT NOT NULL,
+          depth INTEGER NOT NULL,
+          node_limit INTEGER NOT NULL,
+          fanout_limit INTEGER NOT NULL,
+          reachable_count INTEGER NOT NULL,
+          reachable_size INTEGER NOT NULL,
+          truncated INTEGER NOT NULL,
+          computed_at TEXT NOT NULL,
+          PRIMARY KEY (snapshot_id, object_id, algorithm_version, direction, depth, node_limit, fanout_limit)
+        );
+        CREATE TABLE type_reachability_stats (
+          snapshot_id INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          module TEXT NOT NULL,
+          algorithm_version INTEGER NOT NULL,
+          direction TEXT NOT NULL,
+          depth INTEGER NOT NULL,
+          node_limit INTEGER NOT NULL,
+          fanout_limit INTEGER NOT NULL,
+          count INTEGER NOT NULL,
+          shallow_size_sum INTEGER NOT NULL,
+          reachable_size_sum INTEGER NOT NULL,
+          reachable_size_avg REAL NOT NULL,
+          reachable_size_max INTEGER NOT NULL,
+          truncated_count INTEGER NOT NULL,
+          PRIMARY KEY (snapshot_id, type, algorithm_version, direction, depth, node_limit, fanout_limit)
+        );
+        CREATE TABLE findings (
+          finding_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          snapshot_id INTEGER NOT NULL,
+          kind TEXT NOT NULL,
+          severity TEXT NOT NULL,
+          title TEXT NOT NULL,
+          message TEXT NOT NULL,
+          action TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          algorithm_version INTEGER NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE TABLE import_warnings (
+          warning_id INTEGER PRIMARY KEY AUTOINCREMENT,
+          snapshot_id INTEGER,
+          level TEXT NOT NULL,
+          code TEXT NOT NULL,
+          message TEXT NOT NULL,
+          context_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        INSERT INTO snapshots(
+          snapshot_id, source_uri, source_basename, dump_sha256, dump_format,
+          dump_format_version, producer, producer_version, imported_at,
+          import_options_json, object_count, edge_count, shallow_size_sum
+        ) VALUES (
+          1, 'legacy.jsonl.gz', 'legacy.jsonl.gz', 'abc', 'pygco-dump-jsonl',
+          1, 'pygco_dump', '0.1.0', '2026-07-02T00:00:00Z',
+          '{}', 1, 0, 64
+        );
+        INSERT INTO objects(snapshot_id, object_id, type, module, qualname, shallow_size, gc_tracked, stub, repr)
+        VALUES (1, 1, 'dict', 'builtins', 'dict', 64, 1, 0, NULL);
+        INSERT INTO type_stats(snapshot_id, type, module, count, shallow_size_sum, in_edges, out_edges, stub_count)
+        VALUES (1, 'dict', 'builtins', 1, 64, 0, 0, 0);
+        INSERT INTO module_stats(snapshot_id, module, count, shallow_size_sum, in_edges, out_edges)
+        VALUES (1, 'builtins', 1, 64, 0, 0);
+        INSERT INTO findings(snapshot_id, kind, severity, title, message, action, evidence_json, algorithm_version, created_at)
+        VALUES (
+          1, 'large_type', 'info', 'Legacy finding', 'Existing finding row',
+          'Inspect objects', '{"schema_version":1,"kind":"large_type","subject":{"type":"dict"},"metrics":{},"links":[]}',
+          1, '2026-07-02T00:00:00Z'
+        );
+        "#,
+    )
+    .unwrap();
+    (dir, db)
+}
+
+fn import_single_dump(path: &Path) -> (TempDir, PathBuf) {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("analysis.sqlite");
+    let import = json_stdout(run(&[
+        "import".to_owned(),
+        arg(path),
+        "-o".to_owned(),
+        arg(&db),
+        "--rebuild".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(import["snapshots"].as_array().unwrap().len(), 1);
+    (dir, db)
+}
+
+fn write_large_orphan_dump(path: &Path) {
+    let file = File::create(path).unwrap();
+    let mut encoder = GzEncoder::new(file, Compression::fast());
+    writeln!(
+        encoder,
+        r#"{{"record_type":"metadata","phase":"start","format":"pygco-dump-jsonl","format_version":1,"producer":"pygco_dump","producer_version":"0.1.0","producer_run_id":"large-orphan","dump_sequence":1,"created_at":"2026-07-02T00:00:00Z","process_started_at":"2026-07-02T00:00:00Z","host_id":"fixture-host","container_id":null,"pid":4242,"python_version":"3.12.0","platform":"fixture","collect_before_dump":false,"include_referents":true,"include_referent_stubs":true,"include_repr":false,"repr_limit":0,"gc_count":[0,0,0],"gc_stats":null,"object_count":1}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"object","id":700,"type":"app.Buffer","module":"app","qualname":"Buffer","size":2097152,"gc_tracked":true,"stub":false,"referents":[]}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"metadata","phase":"end","dumped_count":1,"stub_count":0,"total_object_records":1,"elapsed_ms":1}}"#
+    )
+    .unwrap();
+    encoder.finish().unwrap();
+}
+
+fn write_container_dump(path: &Path) {
+    let file = File::create(path).unwrap();
+    let mut encoder = GzEncoder::new(file, Compression::fast());
+    writeln!(
+        encoder,
+        r#"{{"record_type":"metadata","phase":"start","format":"pygco-dump-jsonl","format_version":1,"producer":"pygco_dump","producer_version":"0.1.0","producer_run_id":"container-fixture","dump_sequence":1,"created_at":"2026-07-02T00:00:00Z","process_started_at":"2026-07-02T00:00:00Z","host_id":"fixture-host","container_id":null,"pid":4242,"python_version":"3.12.0","platform":"fixture","collect_before_dump":true,"include_referents":true,"include_referent_stubs":true,"include_repr":false,"repr_limit":0,"gc_count":[0,0,0],"gc_stats":null,"object_count":4}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"object","id":900,"type":"collections.deque","module":"collections","qualname":"deque","size":760,"gc_tracked":true,"stub":false,"referents":[901,902,903]}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"object","id":901,"type":"str","module":"builtins","qualname":"str","size":5500,"gc_tracked":false,"stub":false,"referents":[]}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"object","id":902,"type":"str","module":"builtins","qualname":"str","size":5600,"gc_tracked":false,"stub":false,"referents":[]}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"object","id":903,"type":"bytes","module":"builtins","qualname":"bytes","size":2048,"gc_tracked":false,"stub":false,"referents":[]}}"#
+    )
+    .unwrap();
+    writeln!(
+        encoder,
+        r#"{{"record_type":"metadata","phase":"end","dumped_count":4,"stub_count":0,"total_object_records":4,"elapsed_ms":1}}"#
+    )
+    .unwrap();
+    encoder.finish().unwrap();
+}
+
+fn serve_dump_once(bytes: Vec<u8>, filename: &'static str) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut request = [0_u8; 4096];
+        let _ = stream.read(&mut request);
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: application/gzip\r\nContent-Disposition: attachment; filename=\"{filename}\"\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            bytes.len()
+        );
+        stream.write_all(response.as_bytes()).unwrap();
+        stream.write_all(&bytes).unwrap();
+    });
+    format!("http://{addr}/dump?token=SECRET")
 }
 
 #[test]
@@ -929,6 +1181,502 @@ fn findings_and_suspects_expose_diagnostic_leads_without_sql() {
     ]));
     assert!(high_root_table.contains("high_retained_root"));
     assert!(high_root_table.contains("pygco object"));
+    assert!(
+        high_root_table
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .contains("kind"),
+        "table output should have a header row:\n{high_root_table}"
+    );
+    assert!(
+        !high_root_table.contains("kind="),
+        "table output should be aligned columns, not key=value logs:\n{high_root_table}"
+    );
+}
+
+#[test]
+fn p0_leak_workflow_surfaces_quality_suspects_and_annotations() {
+    let (_dir, db) = import_db(&["tiny-v1.jsonl.gz"]);
+
+    let summary = json_stdout(run(&[
+        "summary".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    let quality_warnings = summary["quality"]["warnings"].as_array().unwrap();
+    assert!(quality_warnings
+        .iter()
+        .any(|warning| warning["code"] == "collect_before_dump_false"));
+    assert!(quality_warnings
+        .iter()
+        .any(|warning| warning["code"] == "repr_unavailable"));
+    assert!(quality_warnings
+        .iter()
+        .any(|warning| warning["code"] == "edge_labels_unavailable"));
+
+    let report = json_stdout(run(&[
+        "report".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(report["quality"]["status"], "warning");
+    assert!(report["suspects"]["rows"].is_array());
+    assert_eq!(
+        report["quality"]["warnings"],
+        report["summary"]["quality"]["warnings"]
+    );
+
+    let report_markdown = assert_success(run(&[
+        "report".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "markdown".to_owned(),
+    ]));
+    assert!(report_markdown.contains("## Quality"));
+    assert!(report_markdown.contains("## Top Suspects"));
+    assert!(report_markdown.contains("collect_before_dump_false"));
+
+    let object = json_stdout(run(&[
+        "object".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--id".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(object["object"]["self_edges"], 0);
+    assert_eq!(object["object"]["external_in_edges"], 0);
+    assert_eq!(object["object"]["is_orphan_retained_candidate"], false);
+    assert!(object["object"]["orphan_retained_reason"]
+        .as_str()
+        .unwrap()
+        .contains("external incoming edge"));
+
+    let annotated_paths = json_stdout(run(&[
+        "paths".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--id".to_owned(),
+        "1".to_owned(),
+        "--direction".to_owned(),
+        "referents".to_owned(),
+        "--annotate".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(annotated_paths["annotated"], true);
+    let first_path = &annotated_paths["paths"].as_array().unwrap()[0];
+    assert!(first_path["nodes"].is_array());
+    assert_eq!(first_path["nodes"][0]["object_id"], "1");
+    assert_eq!(first_path["nodes"][0]["external_in_edges"], 0);
+    assert!(first_path["interpretation"].is_array());
+
+    let annotated_table = assert_success(run(&[
+        "paths".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--id".to_owned(),
+        "1".to_owned(),
+        "--direction".to_owned(),
+        "referents".to_owned(),
+        "--annotate".to_owned(),
+        "--format".to_owned(),
+        "table".to_owned(),
+    ]));
+    assert!(annotated_table
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .contains("path_index"));
+    assert!(annotated_table.contains("external_in_edges"));
+    assert!(annotated_table.contains("Root node has no external incoming edge."));
+}
+
+#[test]
+fn p0_report_and_tables_have_stable_degraded_contracts() {
+    let fixture_dir = tempdir().unwrap();
+    let large_dump = fixture_dir.path().join("large-orphan.jsonl.gz");
+    write_large_orphan_dump(&large_dump);
+    let (_large_dir, large_db) = import_single_dump(&large_dump);
+
+    let suspects = json_stdout(run(&[
+        "suspects".to_owned(),
+        arg(&large_db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    let report = json_stdout(run(&[
+        "report".to_owned(),
+        arg(&large_db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(
+        report["suspects"]["rows"][0]["kind"], suspects["rows"][0]["kind"],
+        "report top suspect should reuse the same ordered suspect facts as pygco suspects"
+    );
+    assert_eq!(
+        report["suspects"]["rows"][0]["subject"], suspects["rows"][0]["subject"],
+        "report top suspect subject should match pygco suspects"
+    );
+
+    let (_dir, db) = import_db(&["tiny-v1.jsonl.gz"]);
+    let suspects_table = assert_success(run(&[
+        "suspects".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--kind".to_owned(),
+        "orphan-retained".to_owned(),
+        "--min-reachable".to_owned(),
+        "100b".to_owned(),
+        "--format".to_owned(),
+        "table".to_owned(),
+    ]));
+    let header = suspects_table.lines().next().unwrap_or_default();
+    assert!(
+        header.starts_with("rank  kind"),
+        "suspects table should use diagnostic default columns, got:\n{suspects_table}"
+    );
+    assert!(
+        !header.split_whitespace().any(|column| matches!(
+            column,
+            "metrics" | "limitations" | "subject"
+        )),
+        "suspects table should flatten human fields instead of dumping nested JSON columns:\n{suspects_table}"
+    );
+
+    let projected_table = assert_success(run(&[
+        "suspects".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--kind".to_owned(),
+        "orphan-retained".to_owned(),
+        "--min-reachable".to_owned(),
+        "100b".to_owned(),
+        "--fields".to_owned(),
+        "kind,subject.object_id,metrics.estimated_reachable_size".to_owned(),
+        "--format".to_owned(),
+        "table".to_owned(),
+    ]));
+    let projected_header = projected_table.lines().next().unwrap_or_default();
+    let projected_columns: Vec<&str> = projected_header.split_whitespace().collect();
+    assert_eq!(
+        projected_columns,
+        vec![
+            "kind",
+            "subject.object_id",
+            "metrics.estimated_reachable_size"
+        ],
+        "--fields should preserve nested projection order for table output:\n{projected_table}"
+    );
+    assert!(projected_table.contains("orphan_retained"));
+
+    let (_legacy_dir, legacy_db) = legacy_db_without_object_list_metrics();
+    let legacy_report = json_stdout(run(&[
+        "report".to_owned(),
+        arg(&legacy_db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert!(legacy_report["suspects"]["rows"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    assert_eq!(legacy_report["suspects"]["status"], "unavailable");
+    assert!(legacy_report["suspects"]["limitations"][0]
+        .as_str()
+        .unwrap()
+        .contains("object_list_metrics"));
+}
+
+#[test]
+fn p1_overview_is_a_compact_triage_entrypoint() {
+    let (_dir, db) = import_db(&["tiny-v1.jsonl.gz"]);
+
+    let overview = json_stdout(run(&[
+        "overview".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(overview["snapshot"]["snapshot_id"], 1);
+    assert_eq!(overview["quality"]["status"], "warning");
+    assert_eq!(overview["heavy_suspects"]["status"], "omitted");
+    assert!(overview["heavy_suspects"]["next_command"]
+        .as_str()
+        .unwrap()
+        .contains("pygco suspects"));
+    assert!(overview["sections"]["top_non_builtin_types"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["module"] == "app"));
+    assert!(overview["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|row| row["section"] == "quality"));
+    assert!(overview["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item.as_str().unwrap().contains("Heavy suspect queries")));
+
+    let overview_table = assert_success(run(&[
+        "overview".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--format".to_owned(),
+        "table".to_owned(),
+    ]));
+    let header: Vec<&str> = overview_table
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    assert_eq!(
+        header,
+        vec![
+            "section",
+            "rank",
+            "kind",
+            "subject",
+            "count",
+            "shallow_size",
+            "estimated_reachable_size",
+            "status",
+            "next_command"
+        ]
+    );
+    assert!(overview_table.contains("quality"));
+    assert!(overview_table.contains("top_non_builtin_type"));
+    assert!(overview_table.contains("pygco suspects"));
+    assert!(
+        !overview_table.contains("section="),
+        "overview table should use aligned columns:\n{overview_table}"
+    );
+}
+
+#[test]
+fn p1_container_explains_common_container_contents() {
+    let fixture_dir = tempdir().unwrap();
+    let dump = fixture_dir.path().join("container.jsonl.gz");
+    write_container_dump(&dump);
+    let (_dir, db) = import_single_dump(&dump);
+
+    let container = json_stdout(run(&[
+        "container".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--id".to_owned(),
+        "900".to_owned(),
+        "--top-items".to_owned(),
+        "--item-types".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]));
+    assert_eq!(container["container"]["object_id"], "900");
+    assert_eq!(container["container_kind"], "deque");
+    assert_eq!(container["direct_referent_count"], 3);
+    assert_eq!(container["item_types"]["rows"][0]["type"], "str");
+    assert_eq!(container["item_types"]["rows"][0]["count"], 2);
+    assert_eq!(
+        container["item_types"]["rows"][0]["shallow_size_sum"],
+        11100
+    );
+    assert_eq!(container["top_items"]["rows"][0]["object_id"], "902");
+    assert!(container["limitations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|item| item.as_str().unwrap().contains("edge labels")));
+
+    let table = assert_success(run(&[
+        "container".to_owned(),
+        arg(&db),
+        "--snapshot".to_owned(),
+        "1".to_owned(),
+        "--id".to_owned(),
+        "900".to_owned(),
+        "--top-items".to_owned(),
+        "--item-types".to_owned(),
+        "--format".to_owned(),
+        "table".to_owned(),
+    ]));
+    let header: Vec<&str> = table
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .split_whitespace()
+        .collect();
+    assert_eq!(
+        header,
+        vec![
+            "section",
+            "rank",
+            "object_id",
+            "type",
+            "module",
+            "count",
+            "shallow_size",
+            "shallow_size_sum"
+        ]
+    );
+    assert!(table.contains("item_type"));
+    assert!(table.contains("top_item"));
+    assert!(table.contains("str"));
+    assert!(
+        !table.contains("type="),
+        "container table should use aligned columns:\n{table}"
+    );
+}
+
+#[test]
+fn p2_fetch_and_open_url_record_redacted_source_manifest() {
+    let fixture_dir = tempdir().unwrap();
+    let dump = fixture_dir.path().join("url-dump.jsonl.gz");
+    write_large_orphan_dump(&dump);
+    let bytes = fs::read(&dump).unwrap();
+
+    let fetch_url = serve_dump_once(bytes.clone(), "heap.jsonl.gz");
+    let fetched = fixture_dir.path().join("fetched.jsonl.gz");
+    let fetch = run(&[
+        "fetch".to_owned(),
+        fetch_url,
+        "-o".to_owned(),
+        arg(&fetched),
+        "--header".to_owned(),
+        "Authorization=Bearer SECRET".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]);
+    assert!(
+        !text(&fetch.stdout).contains("SECRET") && !text(&fetch.stderr).contains("SECRET"),
+        "fetch output must redact URL query and secret headers\nstdout:\n{}\nstderr:\n{}",
+        text(&fetch.stdout),
+        text(&fetch.stderr)
+    );
+    let fetch_json: Value = serde_json::from_str(&assert_success(fetch)).unwrap();
+    assert_eq!(fetch_json["local_path"], fetched.display().to_string());
+    assert_eq!(fetch_json["bytes"], bytes.len() as i64);
+    assert_eq!(
+        fetch_json["source"]["original_url"],
+        "http://127.0.0.1:<redacted>/dump?<redacted>"
+    );
+    assert!(fetch_json["sha256"].as_str().unwrap().len() >= 64);
+    assert!(fetched.is_file());
+
+    let cache = tempdir().unwrap();
+    let open_url = serve_dump_once(bytes, "heap.jsonl.gz");
+    let (_lines, database) = run_open_until_database(
+        &[
+            "open".to_owned(),
+            open_url,
+            "--header".to_owned(),
+            "Authorization=Bearer SECRET".to_owned(),
+            "--no-browser".to_owned(),
+        ],
+        &[("PYGCO_HOME", cache.path())],
+    );
+    assert!(database.is_file());
+    let manifest_path = database.parent().unwrap().join("manifest.json");
+    let manifest_raw = fs::read_to_string(&manifest_path).unwrap();
+    assert!(
+        !manifest_raw.contains("SECRET"),
+        "manifest must not leak URL query or secret headers:\n{manifest_raw}"
+    );
+    let manifest: Value = serde_json::from_str(&manifest_raw).unwrap();
+    assert_eq!(
+        manifest["fetched_sources"][0]["source"]["original_url"],
+        "http://127.0.0.1:<redacted>/dump?<redacted>"
+    );
+    assert!(manifest["fetched_sources"][0]["local_path"]
+        .as_str()
+        .unwrap()
+        .ends_with("heap.jsonl.gz"));
+    assert!(manifest["source_dumps"][0]
+        .as_str()
+        .unwrap()
+        .ends_with("heap.jsonl.gz"));
+}
+
+#[test]
+fn p2_import_progress_and_profile_are_machine_safe() {
+    let dir = tempdir().unwrap();
+    let db = dir.path().join("analysis.sqlite");
+    let quiet = run(&[
+        "import".to_owned(),
+        arg(fixture("tiny-v1.jsonl.gz")),
+        "-o".to_owned(),
+        arg(&db),
+        "--rebuild".to_owned(),
+        "--progress".to_owned(),
+        "never".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]);
+    assert_eq!(text(&quiet.stderr), "");
+    let quiet_json: Value = serde_json::from_str(&assert_success(quiet)).unwrap();
+    assert_eq!(quiet_json["snapshots"][0]["object_count"], 4);
+
+    let profiled_db = dir.path().join("profiled.sqlite");
+    let profiled = run(&[
+        "import".to_owned(),
+        arg(fixture("tiny-v1.jsonl.gz")),
+        "-o".to_owned(),
+        arg(&profiled_db),
+        "--rebuild".to_owned(),
+        "--profile".to_owned(),
+        "--progress".to_owned(),
+        "always".to_owned(),
+        "--format".to_owned(),
+        "json".to_owned(),
+    ]);
+    let stderr = text(&profiled.stderr);
+    assert!(
+        stderr.contains("pygco import: start") && stderr.contains("pygco import: finished"),
+        "progress should be written to stderr, got:\n{stderr}"
+    );
+    let profiled_json: Value = serde_json::from_str(&assert_success(profiled)).unwrap();
+    let profile = profiled_json["profile"].as_array().unwrap();
+    assert!(profile
+        .iter()
+        .any(|event| event["phase"] == "build_indexes"));
+    let first = &profile[0];
+    assert!(first["elapsed_ms"].is_number());
+    assert!(first["wall_time_ms"].is_number());
+    assert!(first["self_time_ms"].is_number());
+    assert!(first["nested"].is_boolean());
+    assert!(first["phase_kind"].is_string());
+    assert!(profile
+        .iter()
+        .any(|event| event["snapshot_id"] == 1 && event["nested"] == true));
 }
 
 #[test]
@@ -940,6 +1688,40 @@ fn open_and_web_help_document_dev_proxy_flags() {
     let web_help = assert_success(run(&["web".to_owned(), "--help".to_owned()]));
     assert!(web_help.contains("--dev"));
     assert!(web_help.contains("--dev-server-url"));
+}
+
+#[test]
+fn cli_help_is_agent_friendly() {
+    let root_help = assert_success(run(&["--help".to_owned()]));
+    assert!(root_help.contains("Typical workflows"));
+    assert!(root_help.contains("pygco open dump.jsonl.gz --no-browser"));
+    assert!(root_help.contains("Use --format json for machine-readable output"));
+    assert!(root_help.contains("sessions"));
+
+    let import_help = assert_success(run(&["import".to_owned(), "--help".to_owned()]));
+    assert!(import_help.contains("Examples:"));
+    assert!(import_help.contains("pygco import before.jsonl.gz after.jsonl.gz"));
+    assert!(import_help.contains("--no-reachability"));
+    assert!(import_help.contains("Writes a fresh SQLite analysis database"));
+
+    let objects_help = assert_success(run(&["objects".to_owned(), "--help".to_owned()]));
+    assert!(objects_help.contains("Sort keys:"));
+    assert!(objects_help.contains("reachable-size"));
+    assert!(objects_help.contains("--fields object_id,type,shallow_size"));
+
+    let sql_help = assert_success(run(&["sql".to_owned(), "--help".to_owned()]));
+    assert!(sql_help.contains("Read-only SQL workbench"));
+    assert!(sql_help.contains("--explain"));
+    assert!(sql_help.contains("Only SELECT-style read queries are accepted"));
+
+    let sessions_help = assert_success(run(&[
+        "sessions".to_owned(),
+        "list".to_owned(),
+        "--help".to_owned(),
+    ]));
+    assert!(sessions_help.contains("Cache root order"));
+    assert!(sessions_help.contains("status=ready"));
+    assert!(sessions_help.contains("pygco sessions list --format table"));
 }
 
 #[test]

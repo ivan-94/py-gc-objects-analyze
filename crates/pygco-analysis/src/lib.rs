@@ -14,6 +14,7 @@ pub const REACHABILITY_ALGORITHM_VERSION: i64 = 1;
 pub const DEFAULT_REACHABILITY_DEPTH: i64 = 3;
 pub const DEFAULT_REACHABILITY_NODE_LIMIT: i64 = 10_000;
 pub const DEFAULT_REACHABILITY_FANOUT_LIMIT: i64 = 1_000;
+pub const DEFAULT_ORPHAN_RETAINED_THRESHOLD: i64 = 1024 * 1024;
 
 #[derive(Debug, Error)]
 pub enum AnalysisError {
@@ -337,6 +338,7 @@ pub fn summary(conn: &Connection, snapshot_id: Option<i64>, limit: i64) -> Resul
     let snapshot = snapshot(conn, sid)?;
     Ok(json!({
         "snapshot": snapshot,
+        "quality": quality(conn, sid)?,
         "top_types_by_count": top_types(conn, sid, "count", limit, false)?,
         "top_types_by_shallow_size": top_types(conn, sid, "shallow_size", limit, false)?,
         "top_non_builtin_types_by_count": top_types(conn, sid, "count", limit, true)?,
@@ -350,6 +352,162 @@ pub fn summary(conn: &Connection, snapshot_id: Option<i64>, limit: i64) -> Resul
         "import_warnings": import_warnings(conn, sid)?,
         "rss_gap_note": "GC object dumps only cover Python GC-tracked objects and do not explain full RSS."
     }))
+}
+
+pub fn overview(
+    conn: &Connection,
+    snapshot_id: Option<i64>,
+    limit: i64,
+    with_suspects: bool,
+) -> Result<Value> {
+    let sid = resolve_snapshot_id(conn, snapshot_id)?;
+    let snapshot = snapshot(conn, sid)?;
+    let quality = quality(conn, sid)?;
+    let top_non_builtin_types = top_types(conn, sid, "shallow_size", limit, true)?;
+    let top_non_builtin_reachable_types = top_reachable_types(conn, sid, limit, true)?;
+    let cohorts = cohorts(conn, sid, "shallow_size", limit)?;
+    let heavy_suspects = if with_suspects {
+        match suspects(
+            conn,
+            SuspectsOptions {
+                snapshot_id: Some(sid),
+                limit,
+                ..SuspectsOptions::default()
+            },
+        ) {
+            Ok(value) => value,
+            Err(AnalysisError::InvalidQuery(message))
+                if message.contains("object_list_metrics") =>
+            {
+                json!({
+                    "status": "unavailable",
+                    "rows": [],
+                    "total": 0,
+                    "limitations": [message],
+                    "next_command": format!("pygco import SOURCE -o DB --rebuild")
+                })
+            }
+            Err(error) => return Err(error),
+        }
+    } else {
+        json!({
+            "status": "omitted",
+            "reason": "Heavy suspect queries are omitted from compact overview by default.",
+            "next_command": format!("pygco suspects DB --snapshot {sid} --format table")
+        })
+    };
+    let rows = overview_rows(
+        sid,
+        &snapshot,
+        &quality,
+        &top_non_builtin_types,
+        &cohorts,
+        &heavy_suspects,
+    );
+    Ok(json!({
+        "snapshot": snapshot,
+        "quality": quality,
+        "sections": {
+            "top_non_builtin_types": top_non_builtin_types,
+            "top_non_builtin_reachable_types": top_non_builtin_reachable_types,
+            "cohorts": cohorts,
+        },
+        "heavy_suspects": heavy_suspects,
+        "rows": rows,
+        "limitations": [
+            "Overview is a compact triage entrypoint, not an exhaustive leak analysis.",
+            "Heavy suspect queries are omitted unless --with-suspects is used.",
+            "Single-dump leads are candidates, not confirmed leaks."
+        ],
+        "next_commands": [
+            format!("pygco suspects DB --snapshot {sid} --format table"),
+            format!("pygco objects DB --snapshot {sid} --sort reachable-size --limit 20 --format table"),
+            format!("pygco report DB --snapshot {sid} --format markdown")
+        ]
+    }))
+}
+
+fn overview_rows(
+    snapshot_id: i64,
+    snapshot: &Value,
+    quality: &Value,
+    top_non_builtin_types: &Value,
+    cohorts: &Value,
+    heavy_suspects: &Value,
+) -> Vec<Value> {
+    let mut rows = vec![
+        json!({
+            "section": "quality",
+            "rank": 1,
+            "kind": "snapshot_quality",
+            "subject": format!("snapshot {snapshot_id}"),
+            "count": "",
+            "shallow_size": "",
+            "estimated_reachable_size": "",
+            "status": quality.get("status").and_then(Value::as_str).unwrap_or("unknown"),
+            "next_command": format!("pygco summary DB --snapshot {snapshot_id} --format json"),
+        }),
+        json!({
+            "section": "snapshot",
+            "rank": 1,
+            "kind": "snapshot",
+            "subject": snapshot.get("source_basename").and_then(Value::as_str).unwrap_or("snapshot"),
+            "count": int_field(snapshot, "object_count"),
+            "shallow_size": int_field(snapshot, "shallow_size_sum"),
+            "estimated_reachable_size": "",
+            "status": "",
+            "next_command": format!("pygco objects DB --snapshot {snapshot_id} --sort reachable-size --limit 20 --format table"),
+        }),
+    ];
+    if let Some(items) = top_non_builtin_types.as_array() {
+        for (index, item) in items.iter().take(5).enumerate() {
+            rows.push(json!({
+                "section": "top_non_builtin_type",
+                "rank": (index + 1) as i64,
+                "kind": "type",
+                "subject": format!(
+                    "{}.{}",
+                    item.get("module").and_then(Value::as_str).unwrap_or(""),
+                    item.get("type").and_then(Value::as_str).unwrap_or("")
+                ),
+                "count": int_field(item, "count"),
+                "shallow_size": int_field(item, "shallow_size_sum"),
+                "estimated_reachable_size": int_field(item, "estimated_reachable_size_sum"),
+                "status": "",
+                "next_command": format!(
+                    "pygco objects DB --snapshot {snapshot_id} --type {} --sort reachable-size --limit 20 --format table",
+                    shell_quote(item.get("type").and_then(Value::as_str).unwrap_or(""))
+                ),
+            }));
+        }
+    }
+    if let Some(items) = cohorts.as_array() {
+        for (index, item) in items.iter().take(3).enumerate() {
+            rows.push(json!({
+                "section": "cohort",
+                "rank": (index + 1) as i64,
+                "kind": item.get("cohort").and_then(Value::as_str).unwrap_or("cohort"),
+                "subject": item.get("cohort").and_then(Value::as_str).unwrap_or("cohort"),
+                "count": int_field(item, "count"),
+                "shallow_size": int_field(item, "shallow_size_sum"),
+                "estimated_reachable_size": int_field(item, "estimated_reachable_size_sum"),
+                "status": "",
+                "next_command": format!("pygco objects DB --snapshot {snapshot_id} --cohort {} --format table", shell_quote(item.get("cohort").and_then(Value::as_str).unwrap_or(""))),
+            }));
+        }
+    }
+    rows.push(json!({
+        "section": "heavy_suspects",
+        "rank": 1,
+        "kind": "suspects",
+        "subject": "leak candidates",
+        "count": heavy_suspects.get("total").and_then(Value::as_i64).unwrap_or(0),
+        "shallow_size": "",
+        "estimated_reachable_size": "",
+        "status": heavy_suspects.get("status").and_then(Value::as_str).unwrap_or("available"),
+        "next_command": heavy_suspects.get("next_command").and_then(Value::as_str).unwrap_or("").to_owned(),
+    }));
+    rows
 }
 
 pub fn snapshot(conn: &Connection, snapshot_id: i64) -> Result<Value> {
@@ -601,6 +759,33 @@ fn import_warnings(conn: &Connection, snapshot_id: i64) -> Result<Value> {
     )?;
     let mut rows = stmt.query([snapshot_id])?;
     Ok(Value::Array(rows_to_json(&mut rows)?))
+}
+
+fn quality(conn: &Connection, snapshot_id: i64) -> Result<Value> {
+    let warnings = import_warnings(conn, snapshot_id)?;
+    let rows = warnings.as_array().cloned().unwrap_or_default();
+    let has_warn = rows.iter().any(|row| {
+        matches!(
+            row.get("level").and_then(Value::as_str),
+            Some("warn" | "error")
+        )
+    });
+    let status = if has_warn {
+        "warning"
+    } else if rows.is_empty() {
+        "ok"
+    } else {
+        "info"
+    };
+    let limitations = rows
+        .iter()
+        .filter_map(|row| row.get("message").and_then(Value::as_str))
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "status": status,
+        "warnings": rows,
+        "limitations": limitations,
+    }))
 }
 
 fn missing_stub_summary(conn: &Connection, snapshot_id: i64) -> Result<Value> {
@@ -1627,6 +1812,9 @@ pub fn object_detail(conn: &Connection, snapshot_id: Option<i64>, object_id: i64
                COALESCE(r.truncated, 0) AS reachable_truncated,
                (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.from_id = o.object_id) AS out_edges,
                (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.to_id = o.object_id) AS in_edges,
+               (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.from_id = o.object_id AND e.to_id = o.object_id) AS self_edges,
+               (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.to_id = o.object_id AND e.from_id <> o.object_id) AS external_in_edges,
+               (SELECT COUNT(DISTINCT e.from_id) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.to_id = o.object_id AND e.from_id <> o.object_id) AS external_referrer_count,
                (SELECT COUNT(*)
                 FROM edges e
                 LEFT JOIN objects target
@@ -1655,7 +1843,7 @@ pub fn object_detail(conn: &Connection, snapshot_id: Option<i64>, object_id: i64
         DEFAULT_REACHABILITY_NODE_LIMIT,
         DEFAULT_REACHABILITY_FANOUT_LIMIT
     ])?;
-    let object =
+    let mut object =
         rows_to_json(&mut rows)?
             .into_iter()
             .next()
@@ -1663,12 +1851,48 @@ pub fn object_detail(conn: &Connection, snapshot_id: Option<i64>, object_id: i64
                 snapshot_id: sid,
                 object_id,
             })?;
+    add_orphan_annotation(&mut object);
     Ok(json!({
         "object": object,
         "top_referents": object_edges(conn, Some(sid), object_id, "referents", 20, 0)?["rows"].clone(),
         "top_referrers": object_edges(conn, Some(sid), object_id, "referrers", 20, 0)?["rows"].clone(),
         "actions": ["copy_object_id", "open_referents", "open_referrers", "export_subgraph", "query_same_type"]
     }))
+}
+
+fn add_orphan_annotation(object: &mut Value) {
+    let external_in_edges = int_field(object, "external_in_edges");
+    let estimated_reachable_size = int_field(object, "estimated_reachable_size");
+    let stub = int_field(object, "stub") != 0;
+    let is_candidate = external_in_edges == 0
+        && estimated_reachable_size >= DEFAULT_ORPHAN_RETAINED_THRESHOLD
+        && !stub;
+    let reason = if external_in_edges == 0 {
+        if is_candidate {
+            "Object has no external incoming edge and exceeds the orphan-retained threshold."
+        } else {
+            "Object has no external incoming edge but is below the orphan-retained threshold."
+        }
+    } else {
+        "Object has external incoming edges and is not an orphan-retained candidate."
+    };
+    if let Some(map) = object.as_object_mut() {
+        map.insert(
+            "is_orphan_retained_candidate".to_owned(),
+            Value::Bool(is_candidate),
+        );
+        map.insert(
+            "orphan_retained_reason".to_owned(),
+            Value::String(reason.to_owned()),
+        );
+        map.insert(
+            "limitations".to_owned(),
+            json!([
+                "Single-dump orphan-retained candidates are leads, not confirmed leaks.",
+                "Current dump format does not expose field names, dict keys, list indexes, or local variable names."
+            ]),
+        );
+    }
 }
 
 pub fn object_edges(
@@ -1722,6 +1946,229 @@ pub fn object_edges(
     }))
 }
 
+pub fn container_facts(
+    conn: &Connection,
+    snapshot_id: Option<i64>,
+    object_id: i64,
+    include_top_items: bool,
+    include_item_types: bool,
+    limit: i64,
+) -> Result<Value> {
+    let sid = resolve_snapshot_id(conn, snapshot_id)?;
+    let detail = object_detail(conn, Some(sid), object_id)?;
+    let container = detail["object"].clone();
+    let include_any_section = include_top_items || include_item_types;
+    let include_top_items = include_top_items || !include_any_section;
+    let include_item_types = include_item_types || !include_any_section;
+    let direct_referent_count: i64 = conn.query_row(
+        "
+        SELECT COUNT(*)
+        FROM edges
+        WHERE snapshot_id = ?1 AND from_id = ?2
+        ",
+        params![sid, object_id],
+        |row| row.get(0),
+    )?;
+    let item_types = if include_item_types {
+        container_item_types(conn, sid, object_id, limit)?
+    } else {
+        json!({"rows": [], "total": 0, "limit": limit})
+    };
+    let top_items = if include_top_items {
+        container_top_items(conn, sid, object_id, limit)?
+    } else {
+        json!({"rows": [], "total": 0, "limit": limit})
+    };
+    let rows = container_rows(&container, direct_referent_count, &item_types, &top_items);
+    Ok(json!({
+        "snapshot_id": sid,
+        "object_id": object_id.to_string(),
+        "container_kind": container_kind(&container),
+        "container": container,
+        "direct_referent_count": direct_referent_count,
+        "item_types": item_types,
+        "top_items": top_items,
+        "rows": rows,
+        "limitations": [
+            "Container analysis uses direct referents from the dump graph.",
+            "Current dump format does not expose edge labels, field names, dict keys, list indexes, or queue internals.",
+            "Item shallow sizes are useful for ranking but do not represent retained memory."
+        ],
+        "next_commands": [
+            format!("pygco object DB --snapshot {sid} --id {object_id} --format json"),
+            format!("pygco paths DB --snapshot {sid} --id {object_id} --direction referrers --annotate --format table")
+        ]
+    }))
+}
+
+fn container_item_types(
+    conn: &Connection,
+    snapshot_id: i64,
+    object_id: i64,
+    limit: i64,
+) -> Result<Value> {
+    let total: i64 = conn.query_row(
+        "
+        SELECT COUNT(*)
+        FROM (
+          SELECT COALESCE(target.type, '<missing>') AS type,
+                 COALESCE(target.module, '') AS module
+          FROM edges e
+          LEFT JOIN objects target
+            ON target.snapshot_id = e.snapshot_id
+           AND target.object_id = e.to_id
+          WHERE e.snapshot_id = ?1 AND e.from_id = ?2
+          GROUP BY COALESCE(target.type, '<missing>'), COALESCE(target.module, '')
+        )
+        ",
+        params![snapshot_id, object_id],
+        |row| row.get(0),
+    )?;
+    let mut stmt = conn.prepare(
+        "
+        SELECT COALESCE(target.type, '<missing>') AS type,
+               COALESCE(target.module, '') AS module,
+               COUNT(*) AS count,
+               SUM(COALESCE(target.shallow_size, 0)) AS shallow_size_sum,
+               MAX(COALESCE(target.shallow_size, 0)) AS shallow_size_max,
+               SUM(CASE WHEN target.object_id IS NULL THEN 1 ELSE 0 END) AS missing_count
+        FROM edges e
+        LEFT JOIN objects target
+          ON target.snapshot_id = e.snapshot_id
+         AND target.object_id = e.to_id
+        WHERE e.snapshot_id = ?1 AND e.from_id = ?2
+        GROUP BY COALESCE(target.type, '<missing>'), COALESCE(target.module, '')
+        ORDER BY count DESC, shallow_size_sum DESC, type ASC
+        LIMIT ?3
+        ",
+    )?;
+    let mut rows = stmt.query(params![snapshot_id, object_id, limit])?;
+    Ok(json!({
+        "rows": rows_to_json(&mut rows)?,
+        "total": total,
+        "limit": limit,
+    }))
+}
+
+fn container_top_items(
+    conn: &Connection,
+    snapshot_id: i64,
+    object_id: i64,
+    limit: i64,
+) -> Result<Value> {
+    let total: i64 = conn.query_row(
+        "
+        SELECT COUNT(*)
+        FROM edges
+        WHERE snapshot_id = ?1 AND from_id = ?2
+        ",
+        params![snapshot_id, object_id],
+        |row| row.get(0),
+    )?;
+    let mut stmt = conn.prepare(
+        "
+        SELECT CAST(e.to_id AS TEXT) AS object_id,
+               e.edge_index,
+               CASE WHEN target.object_id IS NULL THEN 1 ELSE 0 END AS missing,
+               COALESCE(target.type, '<missing>') AS type,
+               COALESCE(target.module, '') AS module,
+               COALESCE(target.qualname, '') AS qualname,
+               COALESCE(target.shallow_size, 0) AS shallow_size,
+               COALESCE(target.stub, 0) AS stub,
+               target.repr
+        FROM edges e
+        LEFT JOIN objects target
+          ON target.snapshot_id = e.snapshot_id
+         AND target.object_id = e.to_id
+        WHERE e.snapshot_id = ?1 AND e.from_id = ?2
+        ORDER BY COALESCE(target.shallow_size, 0) DESC, e.edge_index ASC
+        LIMIT ?3
+        ",
+    )?;
+    let mut rows = stmt.query(params![snapshot_id, object_id, limit])?;
+    let mut values = rows_to_json(&mut rows)?;
+    for (index, value) in values.iter_mut().enumerate() {
+        if let Some(object) = value.as_object_mut() {
+            object.insert("rank".to_owned(), json!((index + 1) as i64));
+        }
+    }
+    Ok(json!({
+        "rows": values,
+        "total": total,
+        "limit": limit,
+    }))
+}
+
+fn container_rows(
+    container: &Value,
+    direct_referent_count: i64,
+    item_types: &Value,
+    top_items: &Value,
+) -> Vec<Value> {
+    let mut rows = vec![json!({
+        "section": "container",
+        "rank": 1,
+        "object_id": string_field(container, "object_id"),
+        "type": string_field(container, "type"),
+        "module": string_field(container, "module"),
+        "count": direct_referent_count,
+        "shallow_size": int_field(container, "shallow_size"),
+        "shallow_size_sum": "",
+    })];
+    if let Some(items) = item_types.get("rows").and_then(Value::as_array) {
+        for (index, item) in items.iter().enumerate() {
+            rows.push(json!({
+                "section": "item_type",
+                "rank": (index + 1) as i64,
+                "object_id": "",
+                "type": string_field(item, "type"),
+                "module": string_field(item, "module"),
+                "count": int_field(item, "count"),
+                "shallow_size": int_field(item, "shallow_size_max"),
+                "shallow_size_sum": int_field(item, "shallow_size_sum"),
+            }));
+        }
+    }
+    if let Some(items) = top_items.get("rows").and_then(Value::as_array) {
+        for item in items {
+            rows.push(json!({
+                "section": "top_item",
+                "rank": int_field(item, "rank"),
+                "object_id": string_field(item, "object_id"),
+                "type": string_field(item, "type"),
+                "module": string_field(item, "module"),
+                "count": "",
+                "shallow_size": int_field(item, "shallow_size"),
+                "shallow_size_sum": "",
+            }));
+        }
+    }
+    rows
+}
+
+fn container_kind(container: &Value) -> &'static str {
+    let haystack = format!(
+        "{} {}",
+        string_field(container, "module").to_ascii_lowercase(),
+        string_field(container, "type").to_ascii_lowercase()
+    );
+    if haystack.contains("deque") {
+        "deque"
+    } else if haystack.contains("queue") {
+        "queue"
+    } else if haystack.contains("cache") || haystack.contains("lru") || haystack.contains("ttl") {
+        "cache_like"
+    } else if haystack.contains("dict") {
+        "dict"
+    } else if haystack.contains("list") {
+        "list"
+    } else if haystack.contains("set") {
+        "set"
+    } else {
+        "generic"
+    }
+}
+
 pub fn paths(
     conn: &Connection,
     snapshot_id: Option<i64>,
@@ -1761,6 +2208,172 @@ pub fn paths(
         "fanout_limit": fanout_limit,
         "paths": paths,
     }))
+}
+
+pub fn annotated_paths(
+    conn: &Connection,
+    snapshot_id: Option<i64>,
+    object_id: i64,
+    direction: &str,
+    depth: i64,
+    fanout_limit: i64,
+    limit: i64,
+) -> Result<Value> {
+    let sid = resolve_snapshot_id(conn, snapshot_id)?;
+    let raw = paths(
+        conn,
+        Some(sid),
+        object_id,
+        direction,
+        depth,
+        fanout_limit,
+        limit,
+    )?;
+    let mut annotated = Vec::new();
+    if let Some(paths) = raw.get("paths").and_then(Value::as_array) {
+        for (path_index, path) in paths.iter().enumerate() {
+            let ids = path
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|id| id.as_str()?.parse::<i64>().ok())
+                .collect::<Vec<_>>();
+            let mut nodes = Vec::new();
+            for (depth_index, id) in ids.iter().enumerate() {
+                nodes.push(path_node_annotation(conn, sid, *id, depth_index as i64)?);
+            }
+            annotated.push(json!({
+                "path_index": path_index as i64,
+                "nodes": nodes,
+                "interpretation": path_interpretation(&nodes),
+                "next_commands": [
+                    format!("pygco object DB --snapshot {sid} --id {object_id} --format json")
+                ],
+            }));
+        }
+    }
+    let rows = annotated_path_rows(&annotated);
+    Ok(json!({
+        "object_id": object_id.to_string(),
+        "direction": direction,
+        "depth": depth,
+        "fanout_limit": fanout_limit,
+        "annotated": true,
+        "rows": rows,
+        "paths": annotated,
+        "limitations": [
+            "Path search is bounded by depth, fanout, and limit.",
+            "No path found does not prove no path exists.",
+            "Current dump format does not expose field names, dict keys, list indexes, or local variable names."
+        ],
+    }))
+}
+
+fn annotated_path_rows(paths: &[Value]) -> Vec<Value> {
+    let mut rows = Vec::new();
+    for path in paths {
+        let path_index = path
+            .get("path_index")
+            .and_then(Value::as_i64)
+            .unwrap_or_default();
+        let interpretation = path
+            .get("interpretation")
+            .and_then(Value::as_array)
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            })
+            .unwrap_or_default();
+        if let Some(nodes) = path.get("nodes").and_then(Value::as_array) {
+            for node in nodes {
+                let mut row = node.clone();
+                if let Some(map) = row.as_object_mut() {
+                    map.insert("path_index".to_owned(), Value::from(path_index));
+                    if node.get("depth").and_then(Value::as_i64) == Some(0) {
+                        map.insert(
+                            "interpretation".to_owned(),
+                            Value::String(interpretation.clone()),
+                        );
+                    } else {
+                        map.insert("interpretation".to_owned(), Value::String(String::new()));
+                    }
+                }
+                rows.push(row);
+            }
+        }
+    }
+    rows
+}
+
+fn path_node_annotation(
+    conn: &Connection,
+    snapshot_id: i64,
+    object_id: i64,
+    depth: i64,
+) -> Result<Value> {
+    let mut stmt = conn.prepare(
+        "
+        SELECT CAST(o.object_id AS TEXT) AS object_id,
+               o.type,
+               o.module,
+               o.qualname,
+               COALESCE(m.shallow_size, COALESCE(o.shallow_size, 0)) AS shallow_size,
+               COALESCE(m.reachable_size, 0) AS estimated_reachable_size,
+               COALESCE(m.reachable_count, 0) AS estimated_reachable_count,
+               COALESCE(m.reachable_truncated, 0) AS reachable_truncated,
+               COALESCE(m.in_edges, 0) AS in_edges,
+               COALESCE(m.out_edges, 0) AS out_edges,
+               COALESCE(m.missing_referents, 0) AS missing_referents,
+               o.stub,
+               (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.from_id = o.object_id AND e.to_id = o.object_id) AS self_edges,
+               (SELECT COUNT(*) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.to_id = o.object_id AND e.from_id <> o.object_id) AS external_in_edges,
+               (SELECT COUNT(DISTINCT e.from_id) FROM edges e WHERE e.snapshot_id = o.snapshot_id AND e.to_id = o.object_id AND e.from_id <> o.object_id) AS external_referrer_count
+        FROM objects o
+        LEFT JOIN object_list_metrics m
+          ON m.snapshot_id = o.snapshot_id
+         AND m.object_id = o.object_id
+        WHERE o.snapshot_id = ?1 AND o.object_id = ?2
+        ",
+    )?;
+    let mut rows = stmt.query(params![snapshot_id, object_id])?;
+    let mut value = match rows_to_json(&mut rows)?.into_iter().next() {
+        Some(value) => value,
+        None => json!({
+            "object_id": object_id.to_string(),
+            "missing": true,
+        }),
+    };
+    if let Some(map) = value.as_object_mut() {
+        map.insert("depth".to_owned(), Value::from(depth));
+        map.entry("missing".to_owned())
+            .or_insert(Value::Bool(false));
+    }
+    add_orphan_annotation(&mut value);
+    Ok(value)
+}
+
+fn path_interpretation(nodes: &[Value]) -> Vec<String> {
+    let Some(root) = nodes.first() else {
+        return vec!["No path nodes were returned within the bounded search.".to_owned()];
+    };
+    let mut messages = Vec::new();
+    if int_field(root, "external_in_edges") == 0 {
+        messages.push("Root node has no external incoming edge.".to_owned());
+    }
+    if root
+        .get("is_orphan_retained_candidate")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        messages.push("Root node is an orphan-retained candidate.".to_owned());
+    }
+    if messages.is_empty() {
+        messages.push("Path is a bounded sample, not an exhaustive ownership proof.".to_owned());
+    }
+    messages
 }
 
 pub fn subgraph(
@@ -3026,6 +3639,12 @@ pub fn suspects(conn: &Connection, options: SuspectsOptions) -> Result<Value> {
         };
         rows.append(&mut kind_rows);
     }
+    sort_suspect_rows(&mut rows);
+    for (index, row) in rows.iter_mut().enumerate() {
+        if let Some(object) = row.as_object_mut() {
+            object.insert("rank".to_owned(), json!((index + 1) as i64));
+        }
+    }
     let total = rows.len();
     let rows: Vec<Value> = rows
         .into_iter()
@@ -3047,6 +3666,68 @@ pub fn suspects(conn: &Connection, options: SuspectsOptions) -> Result<Value> {
             "reachability": ReachabilityParams::default()
         }
     }))
+}
+
+fn sort_suspect_rows(rows: &mut [Value]) {
+    rows.sort_by(|left, right| {
+        suspect_severity_rank(left)
+            .cmp(&suspect_severity_rank(right))
+            .then_with(|| suspect_confidence_rank(left).cmp(&suspect_confidence_rank(right)))
+            .then_with(|| suspect_kind_rank(left).cmp(&suspect_kind_rank(right)))
+            .then_with(|| suspect_size(right).cmp(&suspect_size(left)))
+            .then_with(|| suspect_subject_id(left).cmp(&suspect_subject_id(right)))
+    });
+}
+
+fn suspect_severity_rank(value: &Value) -> i64 {
+    match value.get("severity").and_then(Value::as_str) {
+        Some("warn") => 0,
+        Some("info") => 1,
+        Some("error") => 0,
+        _ => 2,
+    }
+}
+
+fn suspect_confidence_rank(value: &Value) -> i64 {
+    match value.get("confidence").and_then(Value::as_str) {
+        Some("high") => 0,
+        Some("medium") => 1,
+        Some("low") => 2,
+        _ => 3,
+    }
+}
+
+fn suspect_kind_rank(value: &Value) -> i64 {
+    match value.get("kind").and_then(Value::as_str) {
+        Some("orphan_retained") => 0,
+        Some("cache_heavy") => 1,
+        Some("async_backlog") => 2,
+        Some("connection_heavy") => 3,
+        Some("high_retained_root") => 4,
+        Some("truncated_root") => 5,
+        Some("type_footprint") => 6,
+        Some("metadata_heavy") => 7,
+        _ => 8,
+    }
+}
+
+fn suspect_size(value: &Value) -> i64 {
+    let Some(metrics) = value.get("metrics") else {
+        return 0;
+    };
+    int_field(metrics, "estimated_reachable_size")
+        .max(int_field(metrics, "estimated_reachable_size_sum"))
+        .max(int_field(metrics, "shallow_size_sum"))
+        .max(int_field(metrics, "shallow_size"))
+}
+
+fn suspect_subject_id(value: &Value) -> String {
+    value
+        .get("subject")
+        .and_then(|subject| subject.get("object_id").or_else(|| subject.get("type")))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_owned()
 }
 
 fn orphan_retained_suspects(
@@ -3626,9 +4307,38 @@ fn percent_encode_query(value: &str) -> String {
 
 pub fn report_json(conn: &Connection, snapshot_id: Option<i64>) -> Result<Value> {
     let sid = resolve_snapshot_id(conn, snapshot_id)?;
+    let summary = summary(conn, Some(sid), 10)?;
+    let quality = summary["quality"].clone();
+    let suspects = match suspects(
+        conn,
+        SuspectsOptions {
+            snapshot_id: Some(sid),
+            limit: 10,
+            ..SuspectsOptions::default()
+        },
+    ) {
+        Ok(value) => value,
+        Err(AnalysisError::InvalidQuery(message)) if message.contains("object_list_metrics") => {
+            json!({
+                "snapshot_id": sid,
+                "status": "unavailable",
+                "rows": [],
+                "total": 0,
+                "limit": 10,
+                "offset": 0,
+                "limitations": [
+                    message,
+                    "Re-import the source dump with current pygco to enable report suspects."
+                ],
+            })
+        }
+        Err(error) => return Err(error),
+    };
     Ok(json!({
         "snapshot_id": sid,
-        "summary": summary(conn, Some(sid), 10)?,
+        "quality": quality,
+        "summary": summary,
+        "suspects": suspects,
         "findings": findings(conn, FindingsOptions { snapshot_id: Some(sid), limit: 10, ..FindingsOptions::default() })?,
         "finding_evidence_schema": finding_evidence_schema(),
         "algorithm_parameters": ReachabilityParams::default(),
@@ -3640,6 +4350,22 @@ pub fn report_markdown(conn: &Connection, snapshot_id: Option<i64>) -> Result<St
     let snapshot = report["summary"]["snapshot"].clone();
     let mut out = String::new();
     out.push_str("# Memory Forensics Report\n\n");
+    out.push_str("## Quality\n\n");
+    out.push_str(&format!(
+        "- Status: {}\n",
+        report["quality"]["status"].as_str().unwrap_or("unknown")
+    ));
+    if let Some(warnings) = report["quality"]["warnings"].as_array() {
+        for warning in warnings {
+            out.push_str(&format!(
+                "- `{}` (`{}`): {}\n",
+                warning["code"].as_str().unwrap_or("warning"),
+                warning["level"].as_str().unwrap_or("info"),
+                warning["message"].as_str().unwrap_or("")
+            ));
+        }
+    }
+    out.push('\n');
     out.push_str("## Snapshot\n\n");
     out.push_str(&format!(
         "- Snapshot: {}\n- Objects: {}\n- Edges: {}\n- Shallow size: {}\n\n",
@@ -3648,7 +4374,25 @@ pub fn report_markdown(conn: &Connection, snapshot_id: Option<i64>) -> Result<St
         snapshot["edge_count"],
         snapshot["shallow_size_sum"]
     ));
-    out.push_str("## Top Leads\n\n");
+    out.push_str("## Top Suspects\n\n");
+    if let Some(rows) = report["suspects"]["rows"].as_array() {
+        if rows.is_empty() {
+            out.push_str("- No suspects met the default report threshold.\n");
+        }
+        for row in rows {
+            out.push_str(&format!(
+                "- **{}** (`{}` / confidence `{}`): {}\n",
+                row["kind"].as_str().unwrap_or("suspect"),
+                row["severity"].as_str().unwrap_or("info"),
+                row["confidence"].as_str().unwrap_or("unknown"),
+                row["reason"].as_str().unwrap_or("")
+            ));
+            if let Some(next) = row["next_command"].as_str() {
+                out.push_str(&format!("  - Next: `{next}`\n"));
+            }
+        }
+    }
+    out.push_str("\n## Top Leads\n\n");
     if let Some(rows) = report["findings"]["rows"].as_array() {
         for row in rows {
             out.push_str(&format!(

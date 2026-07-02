@@ -21,7 +21,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tower_http::services::{ServeDir, ServeFile};
 
-use pygco_analysis::{DiffObjectsOptions, FindingsOptions, ObjectFilters, ReachabilityParams};
+use pygco_analysis::{
+    DiffObjectsOptions, FindingsOptions, ObjectFilters, ReachabilityParams, SuspectsOptions,
+};
 
 struct EmbeddedAsset {
     path: &'static str,
@@ -407,10 +409,12 @@ pub fn app_with_static_dir(database_path: PathBuf, static_dir: Option<PathBuf>) 
         .route("/api/session", get(session))
         .route("/api/snapshots", get(snapshots))
         .route("/api/summary", get(summary))
+        .route("/api/overview", get(overview))
         .route("/api/objects", get(objects))
         .route("/api/objects/:object_id", get(object_detail))
         .route("/api/objects/:object_id/edges", get(object_edges))
         .route("/api/objects/:object_id/paths", get(object_paths))
+        .route("/api/objects/:object_id/container", get(container))
         .route("/api/graph", get(graph))
         .route("/api/types", get(types))
         .route("/api/modules", get(modules))
@@ -418,6 +422,7 @@ pub fn app_with_static_dir(database_path: PathBuf, static_dir: Option<PathBuf>) 
         .route("/api/diff", get(diff))
         .route("/api/diff/objects", get(diff_objects))
         .route("/api/findings", get(findings))
+        .route("/api/suspects", get(suspects))
         .route("/api/sql/query", post(sql_query))
         .route("/api/sql/explain", post(sql_explain))
         .route("/api/reachability/recompute", post(recompute_reachability))
@@ -534,6 +539,25 @@ async fn summary(
 }
 
 #[derive(Debug, Deserialize)]
+struct OverviewQuery {
+    snapshot_id: Option<i64>,
+    limit: Option<i64>,
+    with_suspects: Option<bool>,
+}
+
+async fn overview(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<OverviewQuery>,
+) -> Result<Json<Envelope>, ApiError> {
+    Ok(Json(Envelope::data(pygco_analysis::overview(
+        &conn(&state)?,
+        query.snapshot_id,
+        query.limit.unwrap_or(20),
+        query.with_suspects.unwrap_or(false),
+    )?)))
+}
+
+#[derive(Debug, Deserialize)]
 struct ObjectsQuery {
     snapshot_id: Option<i64>,
     q: Option<String>,
@@ -632,6 +656,7 @@ struct PathsQuery {
     fanout_limit: Option<i64>,
     limit: Option<i64>,
     include_core: Option<bool>,
+    annotate: Option<bool>,
 }
 
 async fn object_paths(
@@ -644,14 +669,52 @@ async fn object_paths(
     let depth = parse_bounded_i64(query.depth, "depth", 5, 0, 10)?;
     let fanout_limit = parse_bounded_i64(query.fanout_limit, "fanout_limit", 30, 1, 5000)?;
     let limit = parse_bounded_i64(query.limit, "limit", 50, 1, 1000)?;
-    Ok(Json(Envelope::data(pygco_analysis::paths(
+    let connection = conn(&state)?;
+    let data = if query.annotate.unwrap_or(false) {
+        pygco_analysis::annotated_paths(
+            &connection,
+            query.snapshot_id,
+            object_id,
+            query.direction.as_deref().unwrap_or("referrers"),
+            depth,
+            fanout_limit,
+            limit,
+        )?
+    } else {
+        pygco_analysis::paths(
+            &connection,
+            query.snapshot_id,
+            object_id,
+            query.direction.as_deref().unwrap_or("referrers"),
+            depth,
+            fanout_limit,
+            limit,
+        )?
+    };
+    Ok(Json(Envelope::data(data)))
+}
+
+#[derive(Debug, Deserialize)]
+struct ContainerQuery {
+    snapshot_id: Option<i64>,
+    top_items: Option<bool>,
+    item_types: Option<bool>,
+    limit: Option<i64>,
+}
+
+async fn container(
+    State(state): State<Arc<ApiState>>,
+    Path(object_id): Path<String>,
+    Query(query): Query<ContainerQuery>,
+) -> Result<Json<Envelope>, ApiError> {
+    let object_id = parse_object_id(&object_id)?;
+    Ok(Json(Envelope::data(pygco_analysis::container_facts(
         &conn(&state)?,
         query.snapshot_id,
         object_id,
-        query.direction.as_deref().unwrap_or("referrers"),
-        depth,
-        fanout_limit,
-        limit,
+        query.top_items.unwrap_or(false),
+        query.item_types.unwrap_or(false),
+        query.limit.unwrap_or(20),
     )?)))
 }
 
@@ -821,6 +884,35 @@ struct FindingsQuery {
     severity: Option<String>,
     limit: Option<i64>,
     offset: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SuspectsQuery {
+    snapshot_id: Option<i64>,
+    kind: Option<String>,
+    min_reachable_size: Option<i64>,
+    non_builtin: Option<bool>,
+    include_stub: Option<bool>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn suspects(
+    State(state): State<Arc<ApiState>>,
+    Query(query): Query<SuspectsQuery>,
+) -> Result<Json<Envelope>, ApiError> {
+    Ok(Json(Envelope::data(pygco_analysis::suspects(
+        &conn(&state)?,
+        SuspectsOptions {
+            snapshot_id: query.snapshot_id,
+            kinds: query.kind.into_iter().collect(),
+            min_reachable_size: query.min_reachable_size.unwrap_or(1024 * 1024),
+            non_builtin: query.non_builtin.unwrap_or(false),
+            include_stub: query.include_stub.unwrap_or(false),
+            limit: query.limit.unwrap_or(20),
+            offset: query.offset.unwrap_or(0),
+        },
+    )?)))
 }
 
 #[derive(Debug, Deserialize)]
@@ -1034,10 +1126,12 @@ pub fn openapi_document() -> Value {
             "/api/session": { "get": client_operation("getSession", "session", "SessionInfo", "data", None, None, vec![]) },
             "/api/snapshots": { "get": client_operation("listSnapshots", "snapshots", "SnapshotsResponse", "data", None, None, vec![]) },
             "/api/summary": { "get": client_operation("getSummary", "summary", "Summary", "data", Some("SnapshotOnlyParams"), None, vec![]) },
+            "/api/overview": { "get": client_operation("getOverview", "overview", "OverviewResponse", "data", Some("OverviewParams"), None, vec![]) },
             "/api/objects": { "get": client_operation("listObjects", "objects", "ObjectRow[]", "envelope", Some("ObjectListParams"), None, vec![]) },
             "/api/objects/{object_id}": { "get": client_operation("getObjectDetail", "objectDetail", "ObjectDetailResponse", "data", Some("SnapshotOnlyParams"), None, vec![path_param("objectId", "object_id", "string")]) },
             "/api/objects/{object_id}/edges": { "get": client_operation("getObjectEdges", "objectEdges", "ObjectEdgesResponse", "data", Some("EdgesParams"), None, vec![path_param("objectId", "object_id", "string")]) },
             "/api/objects/{object_id}/paths": { "get": client_operation("getObjectPaths", "objectPaths", "ObjectPathsResponse", "data", Some("ObjectPathsParams"), None, vec![path_param("objectId", "object_id", "string")]) },
+            "/api/objects/{object_id}/container": { "get": client_operation("getContainer", "container", "ContainerResponse", "data", Some("ContainerParams"), None, vec![path_param("objectId", "object_id", "string")]) },
             "/api/graph": { "get": client_operation("getGraph", "graph", "GraphData", "data", Some("GraphParams"), None, vec![]) },
             "/api/types": { "get": client_operation("listTypes", "types", "StatRow[]", "data", Some("AggregateParams"), None, vec![]) },
             "/api/modules": { "get": client_operation("listModules", "modules", "ModuleRow[]", "data", Some("AggregateParams"), None, vec![]) },
@@ -1045,6 +1139,7 @@ pub fn openapi_document() -> Value {
             "/api/diff": { "get": client_operation("getDiff", "diff", "DiffSummary", "data", Some("DiffParams"), None, vec![]) },
             "/api/diff/objects": { "get": client_operation("listDiffObjects", "diffObjects", "DiffObjectsResponse", "data", Some("DiffObjectsParams"), None, vec![]) },
             "/api/findings": { "get": client_operation("listFindings", "findings", "FindingsResponse", "data", Some("FindingsParams"), None, vec![]) },
+            "/api/suspects": { "get": client_operation("listSuspects", "suspects", "SuspectsResponse", "data", Some("SuspectsParams"), None, vec![]) },
             "/api/sql/query": { "post": client_operation("runSqlQuery", "sqlQuery", "SqlQueryResponse", "data", None, Some("SqlRequest"), vec![]) },
             "/api/sql/explain": { "post": client_operation("explainSqlQuery", "sqlExplain", "SqlQueryResponse", "data", None, Some("SqlRequest"), vec![]) },
             "/api/reachability/recompute": { "post": client_operation("recomputeReachability", "recomputeReachability", "JobData", "data", None, Some("ReachabilityRecomputeRequest"), vec![]) },
@@ -1081,6 +1176,13 @@ pub fn openapi_document() -> Value {
   details?: { types?: { type: string; module: string; count: number; shallow_size_sum: number }[] };
   rules_version: string;
 };"#),
+                "ContainerParams": ts_schema(r#"export type ContainerParams = {
+  snapshot_id?: number;
+  top_items?: boolean;
+  item_types?: boolean;
+  limit?: number;
+};"#),
+                "ContainerResponse": ts_schema(r#"export type ContainerResponse = Record<string, unknown>;"#),
                 "DiffObjectRow": ts_schema(r#"export type DiffObjectRow = {
   object_id: string;
   type: string;
@@ -1215,6 +1317,7 @@ pub fn openapi_document() -> Value {
   fanout_limit?: number;
   limit?: number;
   include_core?: boolean;
+  annotate?: boolean;
 };"#),
                 "ObjectPathsResponse": ts_schema(r#"export type ObjectPathsResponse = {
   paths: string[][];
@@ -1231,6 +1334,12 @@ pub fn openapi_document() -> Value {
   stub: number;
   missing_referents: number;
 };"#),
+                "OverviewParams": ts_schema(r#"export type OverviewParams = {
+  snapshot_id?: number;
+  limit?: number;
+  with_suspects?: boolean;
+};"#),
+                "OverviewResponse": ts_schema(r#"export type OverviewResponse = Record<string, unknown>;"#),
                 "OpenApiDocument": ts_schema(r#"export type OpenApiDocument = Record<string, unknown>;"#),
                 "ReachabilityRecomputeRequest": ts_schema(r#"export type ReachabilityRecomputeRequest = {
   snapshot_id?: number;
@@ -1288,6 +1397,16 @@ pub fn openapi_document() -> Value {
                 "SnapshotsResponse": ts_schema(r#"export type SnapshotsResponse = {
   rows: Snapshot[];
 };"#),
+                "SuspectsParams": ts_schema(r#"export type SuspectsParams = {
+  snapshot_id?: number;
+  kind?: string;
+  min_reachable_size?: number;
+  non_builtin?: boolean;
+  include_stub?: boolean;
+  limit?: number;
+  offset?: number;
+};"#),
+                "SuspectsResponse": ts_schema(r#"export type SuspectsResponse = Record<string, unknown>;"#),
                 "SqlQueryResponse": ts_schema(r#"export type SqlQueryResponse = Record<string, unknown> | JobData;"#),
                 "SqlRequest": ts_schema(r#"export type SqlRequest = {
   query: string;

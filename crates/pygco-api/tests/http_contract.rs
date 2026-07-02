@@ -146,6 +146,12 @@ async fn serves_session_summary_objects_and_graph_contracts() {
     let (status, summary) = request_json(db.clone(), get("/api/summary?snapshot_id=1")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(summary["data"]["snapshot"]["object_count"], 4);
+    assert_eq!(summary["data"]["quality"]["status"], "warning");
+
+    let (status, overview) = request_json(db.clone(), get("/api/overview?snapshot_id=1")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(overview["data"]["quality"]["status"], "warning");
+    assert_eq!(overview["data"]["heavy_suspects"]["status"], "omitted");
 
     let (status, objects) = request_json(
         db.clone(),
@@ -160,6 +166,36 @@ async fn serves_session_summary_objects_and_graph_contracts() {
     let (status, detail) = request_json(db.clone(), get("/api/objects/1?snapshot_id=1")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(detail["data"]["object"]["object_id"], "1");
+    assert_eq!(detail["data"]["object"]["external_in_edges"], 0);
+
+    let (status, annotated_paths) = request_json(
+        db.clone(),
+        get("/api/objects/1/paths?snapshot_id=1&direction=referents&annotate=true"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(annotated_paths["data"]["annotated"], true);
+    assert_eq!(
+        annotated_paths["data"]["paths"][0]["nodes"][0]["object_id"],
+        "1"
+    );
+
+    let (status, container) = request_json(
+        db.clone(),
+        get("/api/objects/1/container?snapshot_id=1&top_items=true&item_types=true"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(container["data"]["container"]["object_id"], "1");
+    assert_eq!(container["data"]["direct_referent_count"], 3);
+
+    let (status, suspects) = request_json(
+        db.clone(),
+        get("/api/suspects?snapshot_id=1&kind=orphan-retained&min_reachable_size=100&limit=1"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(suspects["data"]["rows"][0]["kind"], "orphan_retained");
 
     let (status, graph) = request_json(
         db,
@@ -181,10 +217,12 @@ async fn serves_openapi_static_assets_and_graph_limit_errors() {
         "/api/session",
         "/api/snapshots",
         "/api/summary",
+        "/api/overview",
         "/api/objects",
         "/api/objects/{object_id}",
         "/api/objects/{object_id}/edges",
         "/api/objects/{object_id}/paths",
+        "/api/objects/{object_id}/container",
         "/api/graph",
         "/api/types",
         "/api/modules",
@@ -192,6 +230,7 @@ async fn serves_openapi_static_assets_and_graph_limit_errors() {
         "/api/diff",
         "/api/diff/objects",
         "/api/findings",
+        "/api/suspects",
         "/api/sql/query",
         "/api/sql/explain",
         "/api/reachability/recompute",
@@ -416,8 +455,11 @@ async fn serves_diff_sql_idset_report_and_schema_contracts() {
     assert_eq!(cohorts["data"][0]["cohort"], "database_cache");
     assert!(cohorts["data"][0]["estimated_reachable_size_sum"].is_number());
 
-    let (status, types_by_count) =
-        request_json(db.clone(), get("/api/types?snapshot_id=2&sort=count&limit=2")).await;
+    let (status, types_by_count) = request_json(
+        db.clone(),
+        get("/api/types?snapshot_id=2&sort=count&limit=2"),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(
         types_by_count["data"][0]["count"].as_i64().unwrap()

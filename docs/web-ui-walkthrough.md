@@ -1,13 +1,5 @@
 # Web UI Walkthrough
 
-## Source Manifest
-
-- Web UI contract: `docs/web-ui.md`
-- API contract: `docs/api.md`
-- Quickstart: `docs/quickstart.md`
-- Current implementation entry: `web/app/src/main.tsx`
-- Playwright smoke coverage: `web/app/tests/e2e/pygco.spec.ts`
-
 ## Start
 
 ```bash

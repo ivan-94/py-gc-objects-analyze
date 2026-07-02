@@ -17,7 +17,7 @@
 
 ```bash
 pygco import dump.jsonl.gz -o analysis.sqlite --rebuild
-pygco summary analysis.sqlite --snapshot 1 --format table
+pygco overview analysis.sqlite --snapshot 1 --format table
 pygco objects analysis.sqlite --snapshot 1 --sort reachable-size --limit 20 --format table
 pygco web analysis.sqlite
 ```
@@ -26,6 +26,13 @@ pygco web analysis.sqlite
 
 ```bash
 pygco open dump.jsonl.gz --profile
+```
+
+从 URL 获取 dump：
+
+```bash
+pygco fetch https://example.com/gc-heap-dump -o dump.jsonl.gz
+pygco open https://example.com/gc-heap-dump --no-browser
 ```
 
 多份 dump 会成为同一个 SQLite 里的多个 snapshot：
@@ -40,9 +47,11 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 | 命令 | 用途 |
 | --- | --- |
 | `open` | 导入 dump，启动本地服务，并可自动打开浏览器 |
+| `fetch` | 从 HTTP(S) URL 下载 dump，计算 hash，并输出脱敏来源元数据 |
 | `import` | 把一个或多个 dump 导入 SQLite |
 | `sessions` | 查看 `pygco open` 创建的缓存分析 session |
 | `summary` | 查看 snapshot 概览、top type/module/cohort、warning/finding |
+| `overview` | 作为 leak triage 第一入口，展示质量、top 类型、cohort 和下一步命令 |
 | `objects` | 查询对象列表，支持过滤、排序、分页 |
 | `object` | 查看单个对象的详情、直接 referents/referrers |
 | `edges` | 查询单跳引用关系 |
@@ -51,6 +60,7 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 | `diff-objects` | 对比两个 snapshot 的对象生命周期 |
 | `findings` | 直接列出持久化诊断 leads |
 | `suspects` | 按启发式规则生成内存排查线索 |
+| `container` | 分析常见容器对象的直接 referents、item type 和 top items |
 | `idset` | 对两组 object id SQL 查询做集合运算 |
 | `sql` | 对分析库执行只读 SQL |
 | `schema` | 查看分析库 schema 元数据 |
@@ -109,7 +119,7 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 
 ## `pygco open`
 
-导入一个或多个 dump，启动本地服务，并按配置打开 Web UI。
+导入一个或多个本地 dump 或 URL dump，启动本地服务，并按配置打开 Web UI。
 
 ```bash
 pygco open dump.jsonl.gz
@@ -132,6 +142,10 @@ pygco open before.jsonl.gz after.jsonl.gz --profile
 --dev-server-url <url>          default: http://127.0.0.1:5173/
 --cleanup-on-exit
 --profile
+--progress auto|always|never    default: auto
+--header <KEY=VALUE>            repeatable, URL dump only
+--timeout <seconds>             default: 30
+--max-bytes <bytes>
 ```
 
 语义：
@@ -142,8 +156,48 @@ pygco open before.jsonl.gz after.jsonl.gz --profile
 - `--session-dir <path>` 会使用用户给定目录，适合需要项目本地 session 的场景。
 - `--port 0` 表示自动选择空闲端口。
 - `--profile` 会把 import 阶段耗时放入 JSON 输出。
+- `--progress` 只写 stderr，不污染 JSON stdout；`auto` 仅在 stderr 是 TTY 时显示。
+- 输入是 HTTP(S) URL 时，`open` 会先下载到 session 的 `downloads/` 目录，再导入本地文件。
+- URL 下载会在 `manifest.json` 的 `fetched_sources` 中记录脱敏 original/final URL、local path、SHA-256 和字节数；`Authorization`/`Cookie` 等 header 值不会写入日志或 manifest。
 - `--dev` 面向前端开发：Rust server 提供 API，React dev server 提供 UI。
 - `--cleanup-on-exit` 会在进程退出时清理 session；不传时保留，方便回看 SQLite 和日志。
+
+## `pygco fetch`
+
+从 HTTP(S) URL 下载 dump 到本地文件，并输出脱敏来源信息。
+
+```bash
+pygco fetch https://example.com/gc-heap-dump -o dump.jsonl.gz --format json
+```
+
+带认证 header：
+
+```bash
+pygco fetch https://example.com/gc-heap-dump \
+  --header Authorization=Bearer... \
+  -o dump.jsonl.gz \
+  --format json
+```
+
+参数：
+
+```text
+-o, --output <path>
+--header <KEY=VALUE>            repeatable
+--timeout <seconds>             default: 30
+--max-bytes <bytes>
+--format json|jsonl|table|markdown
+--fields <fields>
+```
+
+语义：
+
+- 使用 HTTP GET，默认跟随有限重定向。
+- 默认校验 TLS。
+- `-o` 未给出时，会优先从 `Content-Disposition` 推断文件名，其次使用 URL path basename。
+- 下载时 streaming 计算 SHA-256。
+- JSON 输出包含 `source.original_url`、`source.final_url`、`local_path`、`sha256`、`bytes` 和 `fetched_at`。
+- URL query 会脱敏；secret header 值不会进入 stdout、stderr、manifest 或错误消息。
 
 ## `pygco sessions`
 
@@ -193,6 +247,7 @@ pygco import before.jsonl.gz after.jsonl.gz -o analysis.sqlite --rebuild --profi
 --reachability-fanout-limit <n> default: 1000
 --rules <cohort-rules.toml>
 --profile
+--progress auto|always|never    default: auto
 --format json|jsonl|table|markdown
 --fields <fields>
 ```
@@ -205,12 +260,54 @@ pygco import before.jsonl.gz after.jsonl.gz -o analysis.sqlite --rebuild --profi
 - 默认计算 estimated reachable size；它是有界估算，不是精确 retained size。
 - `--no-reachability` 或 `--reachability-mode off` 会跳过 reachable 估算。
 - `--rules` 用来加载 cohort 规则，影响 cache/async/connection 等聚合分类。
+- `--progress` 只写 stderr，不污染 JSON stdout；`never` 适合脚本和 Agent，`always` 适合长任务观察。
+- `--profile` 保留旧字段 `phase` / `elapsed_ms`，并增加 `wall_time_ms`、`self_time_ms`、`nested`、`snapshot_id`、`phase_kind`，避免把嵌套阶段简单相加后误读为总耗时。
 
 性能提示：
 
 - 大 dump 首次导入的主要成本在 SQLite 写入、索引和 reachable 估算。
 - 如果只想快速落库做 SQL/浅层统计，可以先用 `--no-reachability`。
 - 如果需要排序 `reachable-size`，不要关闭 reachability。
+
+## `pygco overview`
+
+面向 leak triage 的轻量第一入口。它默认不跑重型 suspect 查询，而是展示证据质量、snapshot、top non-builtin types、cohort/resource 信号和下一步命令。
+
+```bash
+pygco overview analysis.sqlite --snapshot 1 --format table
+```
+
+需要在 overview 内同时跑 suspects：
+
+```bash
+pygco overview analysis.sqlite --snapshot 1 --with-suspects --format json
+```
+
+参数：
+
+```text
+--snapshot <id>
+--limit <n>                     default: 20
+--with-suspects
+--format json|jsonl|table|markdown
+--fields <fields>
+```
+
+输出包含：
+
+- `quality`：导入期质量 warning 和格式限制。
+- `snapshot`：object/edge/shallow size 等概览。
+- `sections.top_non_builtin_types`。
+- `sections.top_non_builtin_reachable_types`。
+- `sections.cohorts`。
+- `heavy_suspects`：默认 `status=omitted`，并给出 `pygco suspects ...` 的 next command。
+- `rows`：给 table 输出使用的扁平行。
+- `limitations` 和 `next_commands`。
+
+使用建议：
+
+- 首次拿到 dump 时先跑 `overview`，再按 next command 跑 `suspects`、`objects`、`report`。
+- `overview` 的目标是快速定向，不是完整 leak 证明。
 
 ## `pygco summary`
 
@@ -238,6 +335,7 @@ pygco summary analysis.sqlite --snapshot 1 --limit 20 --format json
 适合回答：
 
 - 这个 dump 有多少 objects / edges？
+- 这个 dump 有哪些质量限制会影响诊断结论？
 - 总 shallow size 多大？
 - stub / missing referents 是否异常？
 - 哪些 type/module/cohort 排名前列？
@@ -246,6 +344,7 @@ pygco summary analysis.sqlite --snapshot 1 --limit 20 --format json
 限制：
 
 - `summary` 的 JSON 会包含多个 section，真实大 dump 下可能比较长。
+- `quality` 来自导入期 `import_warnings` 和当前格式能力；它用于提示证据限制，不等于导入失败。
 - estimated reachable size 可能互相重叠，适合排名，不适合作为“总占用内存”相加。
 
 ## `pygco objects`
@@ -336,6 +435,8 @@ pygco object analysis.sqlite --snapshot 1 --id 281470886362416 --format json
 - shallow size。
 - estimated reachable size/count。
 - in/out edge counts。
+- self edges、external incoming edges、external referrer count。
+- `is_orphan_retained_candidate` 和解释文本，用于区分“无外部入边的大对象线索”和普通对象。
 - missing referent count。
 - top referents。
 - top referrers。
@@ -389,6 +490,12 @@ pygco edges analysis.sqlite --snapshot 1 --to 281470886362416 --limit 50 --forma
 pygco paths analysis.sqlite --snapshot 1 --id 281470886362416 --direction referrers --depth 5 --fanout 30 --format json
 ```
 
+输出带对象摘要的路径：
+
+```bash
+pygco paths analysis.sqlite --snapshot 1 --id 281470886362416 --direction referrers --annotate --format table
+```
+
 参数：
 
 ```text
@@ -398,6 +505,7 @@ pygco paths analysis.sqlite --snapshot 1 --id 281470886362416 --direction referr
 --depth <n>                     default: 5
 --fanout <n>                    default: 30
 --limit <n>                     default: 50
+--annotate
 --format json|jsonl|table|markdown
 --fields <fields>
 ```
@@ -406,7 +514,9 @@ pygco paths analysis.sqlite --snapshot 1 --id 281470886362416 --direction referr
 
 - `paths` 是采样，不是全图最短路径证明。
 - `depth`、`fanout`、`limit` 都会影响结果；没有返回路径不等于不存在路径。
-- 当前输出偏 object id，需要用 `object` / `edges` 补充关键节点信息。
+- 不带 `--annotate` 时输出 object id 路径，适合脚本兼容。
+- 带 `--annotate` 时，每个路径节点包含 type/module/size/edge count/external ref facts，并输出基础 interpretation 和 next command。
+- 当前边没有字段名、dict key、list index 等标签，所以路径仍不能直接说明“是哪一个属性/槽位持有”。
 
 ## `pygco diff`
 
@@ -591,6 +701,47 @@ type -> type-footprint
 - estimated reachable size 可能互相重叠，不能跨 root 相加。
 - resource 类线索当前主要基于 type/module/cohort pattern，可能包含合法常驻对象。
 
+## `pygco container`
+
+分析一个容器对象的直接 referents，帮助快速判断 deque/queue/cache/dict/list/set 是否存在明显堆积。
+
+```bash
+pygco container analysis.sqlite --snapshot 1 --id 281470886362416 --top-items --item-types --format table
+```
+
+只看 JSON：
+
+```bash
+pygco container analysis.sqlite --snapshot 1 --id 281470886362416 --format json
+```
+
+参数：
+
+```text
+--id <object-id>                required
+--snapshot <id>
+--top-items
+--item-types
+--limit <n>                     default: 20
+--format json|jsonl|table|markdown
+--fields <fields>
+```
+
+输出包含：
+
+- `container`：容器对象摘要，含 type/module/shallow size/external ref facts。
+- `container_kind`：`deque`、`queue`、`cache_like`、`dict`、`list`、`set` 或 `generic`。
+- `direct_referent_count`。
+- `item_types.rows`：直接 referent 按 type/module 聚合后的 count、shallow size sum/max。
+- `top_items.rows`：直接 referent 中 shallow size 最大的对象。
+- `rows`：给 table 输出使用的扁平行。
+- `limitations`：当前 dump 缺少 edge labels、dict keys、queue internals，因此只能解释直接 referents。
+
+限制：
+
+- `container` 不会递归展开整个子图；需要 retained/owner 方向时继续用 `object`、`paths --annotate` 或 `export-subgraph`。
+- item shallow size 适合排名，不等于该容器 retained memory。
+
 ## `pygco idset`
 
 对两个返回 object id 的只读 SQL 查询做集合运算。
@@ -758,7 +909,10 @@ pygco report analysis.sqlite --snapshot 1 --limit 20 --format json
 
 - 人类阅读优先用 `report --format markdown`。
 - 自动化处理可以用 `report --format json`。
-- 如果只想查看诊断 leads，用 `pygco findings` 更直接。
+- 报告默认包含 Quality、Snapshot、Top Suspects、Top Leads 和算法参数。
+- Top Suspects 复用 `pygco suspects` 的候选线索语义，是 investigation leads，不是 confirmed leak。
+- 旧分析库缺少 `object_list_metrics` 时，report 会把 suspects section 标为 `status=unavailable`，而不是让整个报告失败；重新导入源 dump 可恢复完整 suspects。
+- 如果只想查看持久化 findings，用 `pygco findings` 更直接；如果只想查看启发式 leak triage 线索，用 `pygco suspects`。
 
 ## `pygco doctor`
 
@@ -849,9 +1003,9 @@ pygco version
 
 当前 CLI 能分析真实 dump，但还没有把所有诊断工作流产品化成一等命令。不要把下面这些缺口误认为已经实现：
 
-- 还没有 `pygco overview --compact`；当前用 `summary`，但大 dump 下输出偏长。
-- 还没有语义化 `explain`；当前 `object` 是事实展示，不会直接解释“为什么可疑”。
-- `paths` 当前是有界采样，输出仍偏 id，不是完整所有者证明。
+- `overview` 已经是轻量入口，但默认不会跑所有重型 suspect 查询；需要时用 `--with-suspects` 或继续执行 `pygco suspects`。
+- 还没有独立语义化 `explain` 命令；当前 `object`、`paths --annotate`、`container` 是事实展示加基础解释。
+- `paths --annotate` 能读出节点摘要，但路径仍是有界采样，不是完整所有者证明；当前 dump 也没有字段名、dict key、局部变量名。
 
 这些缺口的系统性整改见 [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md) 和 [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)。
 
@@ -914,16 +1068,6 @@ pygco sql analysis.sqlite \
 ```bash
 pygco export-subgraph analysis.sqlite --snapshot 1 --id 281470886362416 --depth 2 --direction both --graph-format dot --format json
 ```
-
-## Source Manifest
-
-本页依据以下来源维护：
-
-- `target/debug/pygco --help`
-- `target/debug/pygco <command> --help`
-- [Generated CLI Help](generated/cli-help.md)
-- [SQLite Schema 规范](sqlite-schema.md)
-- `scripts/check_docs_commands.py`
 
 更新 CLI 行为时，应同步更新本页，并运行：
 

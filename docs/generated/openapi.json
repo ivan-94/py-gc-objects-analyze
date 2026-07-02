@@ -10,6 +10,12 @@
       "CohortRow": {
         "x-typescript": "export type CohortRow = {\n  cohort: string;\n  count: number;\n  shallow_size_sum: number;\n  estimated_reachable_size_sum?: number;\n  estimated_reachable_size_max?: number;\n  reachable_truncated_count?: number;\n  type_count: number;\n  details?: { types?: { type: string; module: string; count: number; shallow_size_sum: number }[] };\n  rules_version: string;\n};"
       },
+      "ContainerParams": {
+        "x-typescript": "export type ContainerParams = {\n  snapshot_id?: number;\n  top_items?: boolean;\n  item_types?: boolean;\n  limit?: number;\n};"
+      },
+      "ContainerResponse": {
+        "x-typescript": "export type ContainerResponse = Record<string, unknown>;"
+      },
       "DiffObjectRow": {
         "x-typescript": "export type DiffObjectRow = {\n  object_id: string;\n  type: string;\n  module: string;\n  from_shallow_size: number | null;\n  to_shallow_size: number | null;\n  shallow_size_delta: number;\n  state: string;\n};"
       },
@@ -65,7 +71,7 @@
         "x-typescript": "export type ObjectListParams = {\n  snapshot_id?: number;\n  q?: string;\n  type?: string;\n  module?: string;\n  cohort?: string;\n  min_shallow_size?: string;\n  min_reachable_size?: string;\n  min_in_edges?: string;\n  min_out_edges?: string;\n  has_referrers?: boolean;\n  missing_referents?: boolean;\n  stub?: string;\n  sort?: string;\n  order?: string;\n  limit?: number;\n  offset?: number;\n};"
       },
       "ObjectPathsParams": {
-        "x-typescript": "export type ObjectPathsParams = {\n  snapshot_id?: number;\n  direction?: string;\n  depth?: number;\n  fanout_limit?: number;\n  limit?: number;\n  include_core?: boolean;\n};"
+        "x-typescript": "export type ObjectPathsParams = {\n  snapshot_id?: number;\n  direction?: string;\n  depth?: number;\n  fanout_limit?: number;\n  limit?: number;\n  include_core?: boolean;\n  annotate?: boolean;\n};"
       },
       "ObjectPathsResponse": {
         "x-typescript": "export type ObjectPathsResponse = {\n  paths: string[][];\n};"
@@ -75,6 +81,12 @@
       },
       "OpenApiDocument": {
         "x-typescript": "export type OpenApiDocument = Record<string, unknown>;"
+      },
+      "OverviewParams": {
+        "x-typescript": "export type OverviewParams = {\n  snapshot_id?: number;\n  limit?: number;\n  with_suspects?: boolean;\n};"
+      },
+      "OverviewResponse": {
+        "x-typescript": "export type OverviewResponse = Record<string, unknown>;"
       },
       "ReachabilityRecomputeRequest": {
         "x-typescript": "export type ReachabilityRecomputeRequest = {\n  snapshot_id?: number;\n  depth?: number;\n  node_limit?: number;\n  fanout_limit?: number;\n};"
@@ -120,6 +132,12 @@
       },
       "Summary": {
         "x-typescript": "export type Summary = {\n  snapshot: Snapshot;\n  top_types_by_shallow_size: StatRow[];\n  top_modules_by_shallow_size: ModuleRow[];\n  top_reachable_types: StatRow[];\n  missing_stub_summary: { stub_count: number; missing_referent_count: number };\n  import_warnings: unknown[];\n};"
+      },
+      "SuspectsParams": {
+        "x-typescript": "export type SuspectsParams = {\n  snapshot_id?: number;\n  kind?: string;\n  min_reachable_size?: number;\n  non_builtin?: boolean;\n  include_stub?: boolean;\n  limit?: number;\n  offset?: number;\n};"
+      },
+      "SuspectsResponse": {
+        "x-typescript": "export type SuspectsResponse = Record<string, unknown>;"
       }
     }
   },
@@ -332,6 +350,29 @@
         }
       }
     },
+    "/api/objects/{object_id}/container": {
+      "get": {
+        "operationId": "getContainer",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "container",
+          "pathParams": [
+            {
+              "name": "objectId",
+              "placeholder": "object_id",
+              "type": "string"
+            }
+          ],
+          "querySchema": "ContainerParams",
+          "responseMode": "data",
+          "responseSchema": "ContainerResponse"
+        }
+      }
+    },
     "/api/objects/{object_id}/edges": {
       "get": {
         "operationId": "getObjectEdges",
@@ -391,6 +432,23 @@
           "pathParams": [],
           "responseMode": "data",
           "responseSchema": "OpenApiDocument"
+        }
+      }
+    },
+    "/api/overview": {
+      "get": {
+        "operationId": "getOverview",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "overview",
+          "pathParams": [],
+          "querySchema": "OverviewParams",
+          "responseMode": "data",
+          "responseSchema": "OverviewResponse"
         }
       }
     },
@@ -595,6 +653,23 @@
           "querySchema": "SnapshotOnlyParams",
           "responseMode": "data",
           "responseSchema": "Summary"
+        }
+      }
+    },
+    "/api/suspects": {
+      "get": {
+        "operationId": "listSuspects",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "x-client": {
+          "methodName": "suspects",
+          "pathParams": [],
+          "querySchema": "SuspectsParams",
+          "responseMode": "data",
+          "responseSchema": "SuspectsResponse"
         }
       }
     },

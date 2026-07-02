@@ -22,3 +22,6 @@ app.add_api_route("/debug/gc-heap-dump", gc_heap_dump_route(), methods=["GET"])
 
 Framework-agnostic integrations only need a binary file-like object. See `examples/` for
 plain file, WSGI, ASGI, and FastAPI variants.
+
+For Celery workers, signal-triggered dumps, and multi-process integration guidance, see
+`../../docs/producer-integration.md`.

@@ -1,14 +1,5 @@
 # Known Limitations
 
-## Source Manifest
-
-- Product boundary: `README.md`, `docs/README.md`
-- Runtime safety boundary: `docs/runtime-safety.md`
-- Data model: `docs/data-model.md`
-- Analysis model: `docs/analysis-model.md`
-- Performance model: `docs/performance.md`
-- Release checklist: `task.md`
-
 ## First-Version Boundaries
 
 - `pygco` is a local single-user tool. It does not provide login, RBAC, remote sharing, multi-user workspaces, or SaaS hosting.

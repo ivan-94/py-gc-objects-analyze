@@ -215,34 +215,7 @@ diff suspects 应优先显示：
 - 不把 SQL 移除；SQL 仍是高级探索能力。
 - 不要求 Web UI e2e 参与 CLI 快速迭代；CLI 变更以 Rust unit/contract/golden 测试为主。
 
-## Source Manifest
-
-### Sources
-
-- User request in side conversation: switch to CLI mode and analyze `.pygco/live-dumps/local-25292-reachable.sqlite`.
-- User follow-up: identify CLI issues exposed by relying on `pygco sql`.
-- User follow-up: provide a systemic remediation plan rather than point fixes.
-- User follow-up: implement the recommendations into docs first, then add a detailed technical spec.
-- Existing docs: [CLI 规范](cli.md), [分析模型](analysis-model.md), [系统架构](architecture.md), [性能规范](performance.md), [SQLite Schema 规范](sqlite-schema.md).
-- Real-data exploration evidence: `pygco objects`, `pygco object`, `pygco paths`, `pygco report`, and read-only `pygco sql` runs against `.pygco/live-dumps/local-25292-reachable.sqlite`.
-
-### Produced artifacts
-
-- [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md)
-- [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)
-
-### Key decisions
-
-- Promote diagnostic facts, suspects, explain, trace, cohorts, and compact overview to first-class CLI concepts.
-- Keep SQL as an escape hatch, not the default investigation workflow.
-- Treat suspects as leads with confidence and limitations, not as leak proof.
-- Make diff the authoritative path for leak confirmation.
-
-### Verification evidence
-
-- Documentation self-check should run `python3 scripts/check_docs_commands.py`; target-state command examples in this document use `text` fences to avoid pretending they are implemented today.
-
-### Open questions / risks
+## Open questions / risks
 
 - Some object explainers need richer producer metadata, such as dict keys, frame locals, generator origin, or container element samples.
 - Threshold defaults for suspects must be tuned against more real dumps.

@@ -18,6 +18,8 @@ app.add_api_route(
 
 这个 endpoint 只负责流式导出 gzip JSONL dump，不做聚合、不做分析。
 
+FastAPI 只是最小示例。Celery worker、Gunicorn/uWSGI `prefork`、管理命令或 daemon 进程可以直接调用底层 `write_gc_dump()`；多进程 worker 推荐按 PID 触发每个进程各自写 dump。详见 [Python Producer 接入指南](producer-integration.md)。
+
 ## 2. 拉取 dump 文件
 
 ```bash

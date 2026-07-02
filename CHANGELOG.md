@@ -1,15 +1,5 @@
 # Changelog
 
-## Source Manifest
-
-- Product boundary: `README.md`, `docs/README.md`
-- CLI contract: `docs/cli.md`
-- API contract: `docs/api.md`
-- Dump format contract: `docs/dump-format.md`
-- SQLite schema contract: `docs/sqlite-schema.md`
-- Analysis model: `docs/analysis-model.md`
-- Release task list: `task.md`
-
 ## 0.1.0 - Unreleased
 
 Initial local Python GC object memory forensics release.
