@@ -1,0 +1,62 @@
+name: release-acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Draft or published release tag to validate, for example v0.1.0-rc.3"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  linux-installer-hat:
+    name: linux installer HAT
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          mkdir -p .scratch/release-hat/assets
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --dir .scratch/release-hat/assets
+      - name: Verify checksums
+        run: |
+          cd .scratch/release-hat/assets
+          sha256sum -c checksums.txt
+      - name: Install through release installer
+        run: |
+          install_dir="$PWD/.scratch/release-hat/bin"
+          chmod +x .scratch/release-hat/assets/install.sh
+          PYGCO_DOWNLOAD_BASE_URL="file://$PWD/.scratch/release-hat/assets" \
+            PYGCO_INSTALL_DIR="$install_dir" \
+            .scratch/release-hat/assets/install.sh
+          "$install_dir/pygco" version
+      - name: Run release smoke commands
+        run: |
+          bin="$PWD/.scratch/release-hat/bin/pygco"
+          work="$PWD/.scratch/release-hat/work"
+          mkdir -p "$work"
+          "$bin" import fixtures/golden/diff-before-v1.jsonl.gz fixtures/golden/diff-after-v1.jsonl.gz \
+            -o "$work/analysis.sqlite" --rebuild > "$work/import.json"
+          "$bin" summary "$work/analysis.sqlite" > "$work/summary.json"
+          "$bin" objects "$work/analysis.sqlite" --limit 5 --format table > "$work/objects.txt"
+          "$bin" diff "$work/analysis.sqlite" --from 1 --to 2 > "$work/diff.json"
+          "$bin" report "$work/analysis.sqlite" --format markdown > "$work/report.md"
+          timeout 5s "$bin" open fixtures/golden/tiny-v1.jsonl.gz \
+            --no-browser --port 0 --cleanup-on-exit > "$work/open.log" 2>&1 || status=$?
+          if [ "${status:-0}" != "0" ] && [ "${status:-0}" != "124" ]; then
+            cat "$work/open.log"
+            exit "$status"
+          fi
+          grep -q "pygco web: http://127.0.0.1:" "$work/open.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-acceptance-linux
+          path: .scratch/release-hat/work

@@ -25,6 +25,16 @@ scripts/release_preflight.sh
 
 The preflight is read-only. It checks local tools, `origin`, GitHub CLI authentication, visible GitHub releases and workflow runs, PyPI package visibility, and required local release files. Any warning should be resolved or recorded in the HAT evidence before publishing a non-draft release.
 
+## Optional Linux Runner HAT
+
+When a local Linux machine is not available, run the manual `release-acceptance` workflow against a draft or published release tag:
+
+```bash
+gh workflow run release-acceptance.yml -f tag=v0.1.0-rc.3
+```
+
+The workflow downloads GitHub Release assets, verifies `checksums.txt`, installs through the release `install.sh`, and runs the fixture import, summary, objects, diff, report, and `open --no-browser` smoke commands on an Ubuntu runner. It is intentionally `workflow_dispatch` only and does not run on push or pull request CI.
+
 ## HAT Checklist
 
 - [ ] Install `pygco` through the release installer on Linux.

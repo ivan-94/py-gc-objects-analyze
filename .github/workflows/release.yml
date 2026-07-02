@@ -144,6 +144,7 @@ jobs:
           sed 's/^DEFAULT_VERSION=.*/DEFAULT_VERSION="${{ steps.release.outputs.version }}"/' scripts/install.sh > dist/install.sh
           chmod 755 dist/install.sh
           (cd dist && sha256sum pygco-*.tar.gz > checksums.txt)
+          python3 scripts/render_release_notes.py "${{ steps.release.outputs.version }}" > release-notes.md
       - name: Create draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -152,4 +153,4 @@ jobs:
             --draft \
             --verify-tag \
             --title "${{ steps.release.outputs.tag }}" \
-            --notes-file CHANGELOG.md
+            --notes-file release-notes.md
