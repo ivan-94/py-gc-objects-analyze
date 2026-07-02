@@ -12,7 +12,8 @@ trap cleanup EXIT INT TERM
 release_dir="$tmp_dir/release"
 payload_dir="$tmp_dir/payload"
 install_dir="$tmp_dir/bin"
-mkdir -p "$release_dir" "$payload_dir" "$install_dir"
+stamped_install_dir="$tmp_dir/bin-stamped"
+mkdir -p "$release_dir" "$payload_dir" "$install_dir" "$stamped_install_dir"
 
 cat > "$payload_dir/pygco" <<'SCRIPT'
 #!/bin/sh
@@ -43,3 +44,11 @@ PYGCO_DOWNLOAD_BASE_URL="file://$release_dir" \
 
 "$install_dir/pygco" version | grep "0.0.0-test" >/dev/null
 grep "installed pygco" /tmp/pygco-install-test.log >/dev/null
+
+sed 's/^DEFAULT_VERSION=.*/DEFAULT_VERSION="0.0.0-test"/' scripts/install.sh > "$tmp_dir/install-stamped.sh"
+PYGCO_INSTALL_DIR="$stamped_install_dir" \
+PYGCO_DOWNLOAD_BASE_URL="file://$release_dir" \
+  sh "$tmp_dir/install-stamped.sh" >/tmp/pygco-install-stamped-test.log
+
+"$stamped_install_dir/pygco" version | grep "0.0.0-test" >/dev/null
+grep "installed pygco" /tmp/pygco-install-stamped-test.log >/dev/null

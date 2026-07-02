@@ -141,7 +141,7 @@ jobs:
       - name: Stamp installer and checksums
         shell: bash
         run: |
-          sed "s/__PYGCO_VERSION__/${{ steps.release.outputs.version }}/g" scripts/install.sh > dist/install.sh
+          sed 's/^DEFAULT_VERSION=.*/DEFAULT_VERSION="${{ steps.release.outputs.version }}"/' scripts/install.sh > dist/install.sh
           chmod 755 dist/install.sh
           (cd dist && sha256sum pygco-*.tar.gz > checksums.txt)
       - name: Create draft GitHub Release
