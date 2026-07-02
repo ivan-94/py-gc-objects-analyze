@@ -98,6 +98,8 @@
   - `gh attestation verify .scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz --repo ivan-94/py-gc-objects-analyze --format json` verified the Linux dry-run archive against `release.yml@refs/heads/main`, commit `a81fcdf`, run `28587529503`, and SLSA provenance subjects for all release assets.
   - `sed 's#dist/##' pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz.sha256 | shasum -a 256 -c -` passed for the downloaded Linux dry-run archive.
   - Final local unit-only verification after documentation evidence updates: `cargo test --workspace --lib --bins`, `. .scratch/build-venv/bin/activate && python -m pytest python/pygco_dump`, and `pnpm --dir web/app test`.
+  - Latest unit-only push CI run `28588236402` passed on commit `9ddb0e7`.
+  - Dependency automation review used `gh pr list --state open --json number,title,author,headRefName,url` and `gh pr view <number> --json files`; npm update PRs expose `web/app/pnpm-lock.yaml`, Cargo update PRs expose `Cargo.lock`, and GitHub Actions update PRs touch workflow YAML only.
 - Chrome DOM verification was run without screenshots:
   - Repository page rendered README install/quickstart content, `releases/latest/download/install.sh`, the `pygco-dump[fastapi]` install command, and license/contributing/security entry links.
   - Rendered docs pages for install, quickstart, runtime safety, troubleshooting, and contributing were reachable from GitHub and showed the expected section headings/content.
@@ -661,14 +663,14 @@ Tasks:
 Acceptance:
 
 - [x] Dependency PRs are automatically opened with clear grouping.
-- [ ] Generated lockfile changes are visible and reviewed.
+- [x] Generated lockfile changes are visible and reviewed.
 - [x] Release workflows are included in dependency scanning.
 
 Verification:
 
 - [x] First dependency automation dry run or initial PR.
 
-External note: Dependabot opened initial PRs after merge/push to GitHub. Generated lockfile review remains a maintainer action before merging those PRs.
+External note: Dependabot opened initial PRs after merge/push to GitHub. File-list review confirmed generated lockfile changes are visible in npm and Cargo PRs; individual PR merge decisions remain separate maintainer review actions.
 
 ### P1-S5. Release Provenance and Artifact Hardening
 
