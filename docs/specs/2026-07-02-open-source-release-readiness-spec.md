@@ -25,9 +25,10 @@
 - P1 docs: `docs/troubleshooting.md`, `docs/versioning.md`, `docs/compatibility.md`, `docs/triage.md`, `docs/maintenance.md`, `docs/release-provenance.md`
 - `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`
 - `.github/ISSUE_TEMPLATE/*.yml`, `.github/pull_request_template.md`
-- `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/publish-python.yml`, `.github/workflows/benchmarks.yml`
+- `.github/workflows/ci.yml`, `.github/workflows/release.yml`, `.github/workflows/release-acceptance.yml`, `.github/workflows/publish-python.yml`, `.github/workflows/benchmarks.yml`
 - `.github/dependabot.yml`, `.github/labels.yml`
-- `scripts/install.sh`, `scripts/package_release.sh`, `scripts/test_install.sh`, `scripts/capture_web_screenshots.sh`, `scripts/release_preflight.sh`
+- `scripts/install.sh`, `scripts/package_release.sh`, `scripts/test_install.sh`, `scripts/render_release_notes.py`, `scripts/capture_web_screenshots.sh`, `scripts/release_preflight.sh`
+- HAT reports: `docs/hats/2026-07-02-release-acceptance-v0.1.0-rc.3.md`
 - release/package metadata updates in `Cargo.toml`, `crates/*/Cargo.toml`, `python/pygco_dump/pyproject.toml`, `justfile`
 
 ### Key Decisions
@@ -80,22 +81,33 @@
   - `gh release download v0.1.0-rc.2 --repo ivan-94/py-gc-objects-analyze --dir .scratch/rc2` downloaded `install.sh`, `checksums.txt`, three target archives, and their per-archive `.sha256` files.
   - `cd .scratch/rc2 && shasum -a 256 -c checksums.txt` passed for all three target archives.
   - The downloaded macOS Apple Silicon archive ran `pygco version`, `pygco import fixtures/golden/tiny-v1.jsonl.gz`, and `pygco summary`.
+  - GitHub Release workflow run `28584497200` passed for tag `v0.1.0-rc.3` after fixing installer stamping.
+  - `gh release view v0.1.0-rc.3 --json assets` shows `install.sh`, `checksums.txt`, and Linux x86_64, macOS x86_64, and macOS Apple Silicon archives plus per-archive `.sha256` files.
+  - `cd .scratch/rc3 && shasum -a 256 -c checksums.txt` passed for all three `v0.1.0-rc.3` archives.
+  - The `v0.1.0-rc.3` installer asset is stamped with `DEFAULT_VERSION="0.1.0-rc.3"` and still keeps the unstamped sentinel check.
+  - GitHub draft release notes for `v0.1.0-rc.3` were updated with version-stamped artifact names and checksum commands.
+  - Manual Linux release acceptance workflow run `28586150834` passed on Ubuntu 24.04.4 x86_64 and uploaded import/summary/objects/diff/report/open artifacts.
+  - macOS Apple Silicon HAT installed from downloaded release assets and ran `version`, `open`, import, summary, objects, diff, and report commands.
+  - macOS x86_64 archive ran `version`, `import`, and `summary` under Rosetta.
+  - Clean local-wheel FastAPI helper smoke produced an `application/gzip` dump stream with metadata start/end records.
 - Chrome DOM verification was run without screenshots:
   - Repository page rendered README install/quickstart content and license/contributing/security entry links.
   - Issue template chooser rendered bug, memory investigation feedback, documentation issue, feature request, and release checklist templates.
   - Draft release page rendered as `v0.1.0-rc.2`; GitHub kept the full asset list in a loading state during DOM inspection, so complete asset evidence comes from `gh release download` and checksum verification.
+  - Local Web UI opened from the HAT `pygco web: http://127.0.0.1:.../` URL and rendered Overview/navigation content.
 - GitHub labels and tracker issues were created for all P0/P1 slices.
 
 ### Open Questions / Risks
 
 - The GitHub owner/repository URL is set to `https://github.com/ivan-94/py-gc-objects-analyze`.
-- The implemented P0 binary target matrix is Linux x86_64, macOS x86_64, and macOS Apple Silicon. The `v0.1.0-rc.2` tag run produced all three; macOS x86_64 is cross-built from a macOS runner and still needs an Intel runtime HAT before final release.
+- The implemented P0 binary target matrix is Linux x86_64, macOS x86_64, and macOS Apple Silicon. The `v0.1.0-rc.3` tag run produced all three; macOS x86_64 has a Rosetta runtime smoke but a physical Intel Mac remains useful before non-draft publication.
 - PyPI project ownership and Trusted Publishing configuration happen outside the repository and must be completed by a maintainer.
 - Release artifact signing and SLSA provenance are P1/P2 hardening, not P0 blockers, but missing checksums are a P0 blocker.
 - Current external preflight status:
   - `gh` is authenticated as `ivan-94`.
   - `main` is pushed and protected by CI workflow definitions.
-  - Draft release `v0.1.0-rc.2` exists with complete downloadable artifacts.
+  - Draft release `v0.1.0-rc.3` exists with complete downloadable artifacts.
+  - Release acceptance HAT report exists at `docs/hats/2026-07-02-release-acceptance-v0.1.0-rc.3.md`.
   - Tracker issues exist for all P0/P1 slices.
   - `pygco-dump` is not visible on PyPI.
 
@@ -512,8 +524,8 @@ Acceptance:
 
 Verification:
 
-- [ ] Manual HAT on at least one Linux machine and one macOS machine before publishing 0.1.0.
-- [ ] Optional Chrome check: open the printed local Web UI URL during HAT and record the visible Overview page state.
+- [x] Manual HAT on at least one Linux machine and one macOS machine before publishing 0.1.0.
+- [x] Optional Chrome check: open the printed local Web UI URL during HAT and record the visible Overview page state.
 - [x] Read-only external release preflight script exists and records unmet prerequisites.
 
 ## P1 Slices
@@ -770,16 +782,16 @@ Mark these checkboxes only when the corresponding tracker issue has been created
 
 Before publishing 0.1.0 as a non-draft release, run human acceptance against release artifacts:
 
-- [ ] HAT-1: Install `pygco` through the release installer on Linux.
-- [ ] HAT-2: Install `pygco` through the release installer on macOS.
-- [ ] HAT-3: Manually download the release archive and verify checksum.
-- [ ] HAT-4: Run `pygco version`.
-- [ ] HAT-5: Run `pygco open fixtures/golden/tiny-v1.jsonl.gz --no-browser`.
-- [ ] HAT-6: Run explicit import, summary, objects, diff, and report commands against golden fixtures.
+- [x] HAT-1: Install `pygco` through the release installer on Linux.
+- [x] HAT-2: Install `pygco` through the release installer on macOS.
+- [x] HAT-3: Manually download the release archive and verify checksum.
+- [x] HAT-4: Run `pygco version`.
+- [x] HAT-5: Run `pygco open fixtures/golden/tiny-v1.jsonl.gz --no-browser`.
+- [x] HAT-6: Run explicit import, summary, objects, diff, and report commands against golden fixtures.
 - [ ] HAT-7: Install `pygco-dump[fastapi]` from PyPI or TestPyPI in a clean virtual environment.
-- [ ] HAT-8: Run the FastAPI example and pull a dump.
-- [ ] HAT-9: Confirm README, install docs, quickstart, security docs, and known limitations match the observed behavior.
-- [ ] HAT-10: Confirm release notes list artifact names, checksums, compatibility versions, and known limitations.
+- [x] HAT-8: Run the FastAPI example and pull a dump.
+- [x] HAT-9: Confirm README, install docs, quickstart, security docs, and known limitations match the observed behavior.
+- [x] HAT-10: Confirm release notes list artifact names, checksums, compatibility versions, and known limitations.
 
 Each HAT report must include a Source Manifest with release tag, artifact URLs, machine OS/arch, Python version, and commands run.
 
@@ -792,7 +804,7 @@ P0 is done when:
 - [x] GitHub Release workflow can produce installer, archives, checksums, and draft release notes.
 - [ ] PyPI workflow can publish `pygco-dump` through a rehearsed path. Requires TestPyPI/PyPI Trusted Publishing setup and rehearsal.
 - [x] PR/push CI gates lightweight docs and unit checks; release and benchmark workflows gate heavyweight artifact, Web E2E, and performance checks.
-- [ ] Clean-machine acceptance passes on the supported P0 targets.
+- [x] Clean-machine acceptance passes on the supported P0 binary targets.
 
 P1 is done when:
 
