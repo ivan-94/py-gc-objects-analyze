@@ -93,6 +93,7 @@
   - Clean local-wheel FastAPI helper smoke produced an `application/gzip` dump stream with metadata start/end records.
   - `publish-python` workflow dispatch run `28586504894` built `pygco_dump-0.1.0.tar.gz` and `pygco_dump-0.1.0-py3-none-any.whl`, passed `twine check`, and tested the built wheel.
   - The same TestPyPI publish rehearsal failed at the upload step with `invalid-publisher`; the reported trusted publisher claim was `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
+  - Retried TestPyPI publish rehearsal run `28589579759`; package build, `twine check`, artifact upload, and built-wheel smoke passed again. Upload still failed with `invalid-publisher`; claims were `repository=ivan-94/py-gc-objects-analyze`, `workflow_ref=ivan-94/py-gc-objects-analyze/.github/workflows/publish-python.yml@refs/heads/main`, `ref=refs/heads/main`, and `environment=testpypi`.
   - Release workflow dry run `28587055092` completed with `tag=dry-run`, built release artifacts/notes, and skipped draft release creation.
   - Release workflow dry run `28587529503` completed with `tag=dry-run-attest` on commit `a81fcdf`; `Attest release artifacts` created provenance for 8 subjects.
   - `gh attestation verify .scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz --repo ivan-94/py-gc-objects-analyze --format json` verified the Linux dry-run archive against `release.yml@refs/heads/main`, commit `a81fcdf`, run `28587529503`, and SLSA provenance subjects for all release assets.
@@ -460,7 +461,7 @@ Verification:
 - [x] `python -m pytest python/pygco_dump`
 - [ ] TestPyPI rehearsal before first PyPI publish.
 
-External note: TestPyPI/PyPI Trusted Publishing must be configured in the package index before publish can pass. Rehearsal run `28586504894` confirmed the repository workflow builds and validates the package; TestPyPI rejected upload with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
+External note: TestPyPI/PyPI Trusted Publishing must be configured in the package index before publish can pass. Rehearsal runs `28586504894` and `28589579759` confirmed the repository workflow builds and validates the package; TestPyPI rejected upload with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
 
 ### P0-S7. Lightweight PR CI and Release Gates
 

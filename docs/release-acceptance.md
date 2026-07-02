@@ -66,6 +66,8 @@ Before HAT can check the TestPyPI/PyPI install path, configure a trusted publish
 
 The 2026-07-02 TestPyPI rehearsal run `28586504894` built the wheel and sdist successfully, passed `twine check`, and tested the built wheel. The upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`, which means the matching TestPyPI trusted publisher was not configured yet.
 
+Retry run `28589579759` produced the same result: build, `twine check`, built-wheel smoke, and artifact upload passed; TestPyPI still rejected the trusted publishing exchange with `invalid-publisher` for repository `ivan-94/py-gc-objects-analyze`, workflow `publish-python.yml@refs/heads/main`, and environment `testpypi`.
+
 ## HAT Checklist
 
 - [ ] Install `pygco` through the release installer on Linux.

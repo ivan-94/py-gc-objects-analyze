@@ -18,6 +18,7 @@
 - Attestation release dry-run workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28587529503
 - Linux release acceptance workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586150834
 - TestPyPI publish rehearsal workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28586504894
+- TestPyPI publish rehearsal retry workflow run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28589579759
 - Lightweight unit CI confirmation run: https://github.com/ivan-94/py-gc-objects-analyze/actions/runs/28587516812
 - GitHub Release tag: `v0.1.0-rc.3`
 - GitHub Release URL: https://github.com/ivan-94/py-gc-objects-analyze/releases/tag/untagged-d5226fc5b2c3a3d763e8
@@ -60,6 +61,7 @@
 - macOS x86_64 archive ran `pygco version`, `import`, and `summary` under Rosetta on Apple Silicon.
 - FastAPI helper was installed from the local wheel in a clean venv and produced an `application/gzip` dump stream with `metadata/start` and `metadata/end` records.
 - TestPyPI publish rehearsal run `28586504894` built the wheel and sdist, passed `twine check`, and tested the built wheel; upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`.
+- TestPyPI publish rehearsal retry `28589579759` again passed package build, `twine check`, built-wheel smoke, and artifact upload; the TestPyPI upload still failed with `invalid-publisher` for matching repository/workflow/environment claims.
 - Lightweight CI run `28587516812` passed on commit `a81fcdf` with only `rust-unit`, `python-unit`, and `web-unit`.
 - Release dry-run `28587529503` passed with `tag=dry-run-attest`; `Attest release artifacts` created provenance for 8 subjects, and `gh attestation verify` passed for `.scratch/dry-run-attest/release-linux/pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz`.
 - Chrome DOM verification was performed without screenshots:
