@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any, BinaryIO
 
 FORMAT_NAME = "pygco-dump-jsonl"
@@ -20,7 +20,7 @@ FORMAT_VERSION = 1
 PRODUCER = "pygco_dump"
 PRODUCER_VERSION = "0.1.0"
 _PRODUCER_RUN_ID = uuid.uuid4().hex
-_PROCESS_STARTED_AT = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+_PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 _DUMP_LOCK = threading.Lock()
 _SEQUENCE_LOCK = threading.Lock()
 _DUMP_SEQUENCE = 0
@@ -116,7 +116,7 @@ def _iter_gc_dump_records_unlocked(
     snapshot_objects = list(objects) if objects is not None else list(gc.get_objects())
     snapshot_ids = {id(obj) for obj in snapshot_objects}
     stub_seen: set[int] = set()
-    created_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    created_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     yield {
         "record_type": "metadata",

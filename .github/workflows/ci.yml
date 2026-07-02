@@ -58,9 +58,11 @@ jobs:
           node-version: "22"
           cache: pnpm
           cache-dependency-path: web/app/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
       - run: pnpm --dir web/app install --frozen-lockfile
       - run: pnpm --dir web/app typecheck
       - run: pnpm --dir web/app build
+      - run: cargo build -p pygco-cli
       - run: pnpm --dir web/app exec playwright install --with-deps chromium
       - run: pnpm --dir web/app test:e2e
 
@@ -82,6 +84,7 @@ jobs:
       - run: PYGCO_WEB_DIST="$PWD/web/app/dist" cargo build --release -p pygco-cli
       - run: scripts/package_release.sh
       - run: scripts/test_install.sh
+      - run: mkdir -p .scratch
       - run: ./target/release/pygco import fixtures/golden/tiny-v1.jsonl.gz -o .scratch/release-smoke.sqlite --rebuild
 
   bench-smoke:
