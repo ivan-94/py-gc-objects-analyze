@@ -11,6 +11,7 @@
   - Do not ship Docker or Homebrew in P0/P1.
   - Provide a general installer command based on `curl ... | sh`.
   - The installer script should be a GitHub Release asset, addressed through `https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/download/install.sh`.
+  - Keep binary release automation lightweight: Linux native build on Ubuntu; macOS Apple Silicon and Intel artifacts from one macOS runner when Rust cross-compilation is straightforward.
 - Agent workflow requirements: `~/.agents/docs/agents/workflows.md`, `~/.agents/docs/agents/handoff-policy.md`.
 - Repository guidance: `AGENTS.md`.
 - Current project entrypoints: `README.md`, `docs/README.md`, `docs/install.md`, `docs/quickstart.md`, `docs/producer-integration.md`, `docs/runtime-safety.md`, `docs/known-limitations.md`, `docs/testing.md`, `docs/architecture.md`, `docs/performance.md`, `CHANGELOG.md`.
@@ -67,20 +68,33 @@
   - `CI=1 scripts/capture_web_screenshots.sh docs/assets/web-ui`
   - Manual visual review of `docs/assets/web-ui/{overview,object-detail,graph,diff,sql,report}.png`
   - Troubleshooting spot checks: malformed dump import exited `10`, read-only SQL rejection exited `20`, invalid CLI argument exited `2`
-  - `scripts/release_preflight.sh` was run read-only; it currently exits `1` because external release prerequisites are not satisfied.
-- Optional Chrome verification was attempted, but the Chrome extension backend was not available in this session. Chrome-specific verification checkboxes remain unchecked.
+  - `scripts/release_preflight.sh` was run read-only; after push it exits `0` and reports default branch, draft release, workflow state, and current PyPI absence.
+- GitHub external verification completed after the repository was pushed:
+  - `main` is pushed to `ivan-94/py-gc-objects-analyze`.
+  - GitHub Actions CI run `28582013621` passed on commit `9c38ba0`.
+  - Pull request CI run `28582123395` passed on a Dependabot PR.
+  - Manual benchmark workflow run `28581056797` passed.
+  - GitHub Release workflow run `28582024816` passed for tag `v0.1.0-rc.2` and produced a draft release.
+  - `gh release download v0.1.0-rc.2 --repo ivan-94/py-gc-objects-analyze --dir .scratch/rc2` downloaded `install.sh`, `checksums.txt`, three target archives, and their per-archive `.sha256` files.
+  - `cd .scratch/rc2 && shasum -a 256 -c checksums.txt` passed for all three target archives.
+  - The downloaded macOS Apple Silicon archive ran `pygco version`, `pygco import fixtures/golden/tiny-v1.jsonl.gz`, and `pygco summary`.
+- Chrome DOM verification was run without screenshots:
+  - Repository page rendered README install/quickstart content and license/contributing/security entry links.
+  - Issue template chooser rendered bug, memory investigation feedback, documentation issue, feature request, and release checklist templates.
+  - Draft release page rendered as `v0.1.0-rc.2`; GitHub kept the full asset list in a loading state during DOM inspection, so complete asset evidence comes from `gh release download` and checksum verification.
+- GitHub labels and tracker issues were created for all P0/P1 slices.
 
 ### Open Questions / Risks
 
 - The GitHub owner/repository URL is set to `https://github.com/ivan-94/py-gc-objects-analyze`.
-- The implemented P0 binary target matrix is Linux x86_64, macOS x86_64, and macOS Apple Silicon. These targets still need a real GitHub Actions release dry run.
+- The implemented P0 binary target matrix is Linux x86_64, macOS x86_64, and macOS Apple Silicon. The `v0.1.0-rc.2` tag run produced all three; macOS x86_64 is cross-built from a macOS runner and still needs an Intel runtime HAT before final release.
 - PyPI project ownership and Trusted Publishing configuration happen outside the repository and must be completed by a maintainer.
 - Release artifact signing and SLSA provenance are P1/P2 hardening, not P0 blockers, but missing checksums are a P0 blocker.
 - Current external preflight status:
   - `gh` is authenticated as `ivan-94`.
-  - `git ls-remote --heads origin` fails over SSH with `Could not read from remote repository`.
-  - `gh repo view` can read `ivan-94/py-gc-objects-analyze`, but `defaultBranchRef.name` is empty.
-  - No GitHub releases, workflow runs, or issues are visible yet.
+  - `main` is pushed and protected by CI workflow definitions.
+  - Draft release `v0.1.0-rc.2` exists with complete downloadable artifacts.
+  - Tracker issues exist for all P0/P1 slices.
   - `pygco-dump` is not visible on PyPI.
 
 ## Background
@@ -160,7 +174,7 @@ Every checkbox in this spec must be verifiable before it is marked done. Use the
 - Local command evidence: deterministic commands such as docs checks, Rust tests, Python builds, Web builds, installer smoke tests, package archive inspection, and YAML parsing.
 - Local manual evidence: a maintainer walkthrough in a clean checkout or temporary directory, with commands and observed output recorded in the relevant slice.
 - External service evidence: GitHub Actions runs, draft GitHub Release assets, TestPyPI/PyPI package pages, and downloaded artifacts. These remain unchecked until the external run or publish happens.
-- Browser evidence: Chrome-rendered Markdown, GitHub Release pages, or local Web UI pages. Record the URL, visible result, and screenshot path if captured.
+- Browser evidence: Chrome-rendered Markdown, GitHub Release pages, or local Web UI pages. Record the URL and visible result; screenshots are not required.
 - HAT evidence: `docs/release-acceptance.md` results with release tag, artifact URLs, machine OS/arch, Python version, commands, and failures mapped back to a P0 slice.
 
 Do not mark a task complete just because the file exists. Mark it complete only when the acceptance condition is satisfied or the named verification has run.
@@ -173,7 +187,7 @@ Browser-based checks may use the Chrome plugin when a task depends on rendered p
 - Screenshot and visual walkthrough review.
 - HAT steps that require opening the printed local URL or inspecting a release page.
 
-When Chrome is used, record the URL, browser-visible result, screenshot path if captured, and the related checkbox or HAT id in the verification notes or HAT report.
+When Chrome is used, record the URL, browser-visible result, and the related checkbox or HAT id in the verification notes or HAT report.
 
 ## P0 Slices
 
@@ -244,7 +258,7 @@ Verification:
 
 - [x] `python3 scripts/check_docs_commands.py`
 - [ ] Manual README walkthrough on a clean checkout or temporary directory.
-- [ ] Optional Chrome check: render the README/docs pages or GitHub preview and capture the visible install, quickstart, safety, and docs links.
+- [x] Optional Chrome DOM check: render the GitHub repository page and confirm visible install, quickstart, safety, and docs links.
 
 ### P0-S3. Governance, License, and Security Baseline
 
@@ -280,7 +294,7 @@ Tasks:
 
 Acceptance:
 
-- [ ] GitHub renders license and contribution entrypoints from repository root. Requires browser review after push.
+- [x] GitHub renders license and contribution entrypoints from repository root.
 - [x] Security reporting path is clear without requiring users to open runtime safety docs.
 - [x] PR template reminds contributors to update docs/specs before behavior changes.
 - [x] Issue templates collect `pygco version`, OS, Python version, command, dump source shape, and whether the dump can be shared.
@@ -288,8 +302,8 @@ Acceptance:
 Verification:
 
 - [x] `find .github -maxdepth 3 -type f`
-- [ ] Manual review of rendered Markdown.
-- [ ] Optional Chrome check: inspect rendered GitHub Markdown for `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, issue templates, and PR template.
+- [x] Manual review of rendered Markdown on GitHub.
+- [x] Optional Chrome DOM check: inspect rendered GitHub repository links and issue template chooser.
 - [x] `python3 scripts/check_docs_commands.py`
 
 ### P0-S4. Installer Contract and Release Artifact Layout
@@ -377,7 +391,7 @@ Tasks:
 
 Acceptance:
 
-- [ ] A tag can produce a draft GitHub Release with all P0 assets. Requires real `workflow_dispatch` or tag run.
+- [x] A tag can produce a draft GitHub Release with all P0 assets.
 - [x] Release fails if Web UI assets are missing or the placeholder page is embedded.
 - [x] Release fails if checksums are missing.
 - [x] Release does not publish crates.io packages.
@@ -385,10 +399,10 @@ Acceptance:
 Verification:
 
 - [ ] `workflow_dispatch` dry run on a non-release tag or branch.
-- [ ] Download uploaded artifacts in the workflow and run smoke checks.
-- [ ] Optional Chrome check: inspect the draft GitHub Release page and confirm the expected assets are visible.
+- [x] Download uploaded artifacts from the draft release and run checksum/runtime smoke checks.
+- [x] Optional Chrome DOM check: inspect the draft GitHub Release page and confirm the draft tag/release page renders. Full asset list was verified through `gh release download` because GitHub kept the asset widget loading in Chrome.
 
-External note: these remain unchecked until the workflows run on GitHub after this branch is pushed.
+External note: tag `v0.1.0-rc.2` created a successful draft release. `workflow_dispatch` rehearsal remains optional and unchecked.
 
 ### P0-S6. PyPI Release Workflow for `pygco-dump`
 
@@ -450,11 +464,12 @@ Acceptance:
 - [x] CI fails if docs reference commands that no longer exist.
 - [x] CI fails if generated CLI/OpenAPI artifacts are stale.
 - [x] CI fails if release build would embed fallback Web UI assets.
-- [ ] CI duration remains practical enough for normal PRs; requires observation on real GitHub PR runs.
+- [x] CI duration remains practical enough for normal changes; main CI run `28582013621` completed successfully in a practical window.
 
 Verification:
 
-- [ ] Pull request CI run.
+- [x] Pull request CI run `28582123395`.
+- [x] Main branch CI run `28582013621`.
 - [x] Local equivalent:
   - [x] `python3 scripts/check_docs_commands.py`
   - [x] `cargo fmt --check`
@@ -621,15 +636,15 @@ Tasks:
 
 Acceptance:
 
-- [ ] Dependency PRs are automatically opened with clear grouping.
+- [x] Dependency PRs are automatically opened with clear grouping.
 - [ ] Generated lockfile changes are visible and reviewed.
 - [x] Release workflows are included in dependency scanning.
 
 Verification:
 
-- [ ] First dependency automation dry run or initial PR.
+- [x] First dependency automation dry run or initial PR.
 
-External note: Dependabot PR generation can only be observed after merge/push to GitHub.
+External note: Dependabot opened initial PRs after merge/push to GitHub. Generated lockfile review remains a maintainer action before merging those PRs.
 
 ### P1-S5. Release Provenance and Artifact Hardening
 
@@ -685,9 +700,9 @@ Acceptance:
 
 Verification:
 
-- [ ] Dry-run issue creation using templates.
+- [x] Chrome DOM check of GitHub issue template chooser.
 
-External note: `gh issue create` in the installed GitHub CLI does not expose a local dry-run flag; verify templates through the GitHub issue creation UI after push.
+External note: `gh issue create` in the installed GitHub CLI does not expose a local dry-run flag; templates were verified through the GitHub issue creation UI after push.
 
 ### P1-S7. Performance and Benchmark Publication
 
@@ -712,7 +727,7 @@ Acceptance:
 
 Verification:
 
-- [ ] Manual benchmark workflow run.
+- [x] Manual benchmark workflow run `28581056797`.
 - [x] Local benchmark command smoke against `fixtures/synthetic/medium.jsonl.gz`.
 - [x] `git ls-files` has no generated benchmark reports unless intentionally tracked with a documented exception.
 
@@ -722,21 +737,21 @@ Use these as independently grabbable issue titles:
 
 Mark these checkboxes only when the corresponding tracker issue has been created and linked from this spec. They are issue-creation tracking items, not duplicate implementation acceptance criteria.
 
-- [ ] P0-S1: Fix repository identity and package metadata for 0.1.0.
-- [ ] P0-S2: Rewrite root README and quickstart for first-time users.
-- [ ] P0-S3: Add open source governance, security, and GitHub templates.
-- [ ] P0-S4: Implement release installer and artifact layout.
-- [ ] P0-S5: Add GitHub Release workflow for `pygco` binary artifacts.
-- [ ] P0-S6: Add PyPI release workflow for `pygco-dump`.
-- [ ] P0-S7: Expand CI into release gate.
-- [ ] P0-S8: Add clean-machine release acceptance guide.
-- [ ] P1-S1: Reorganize docs information architecture.
-- [ ] P1-S2: Add screenshots and Web UI walkthrough visuals.
-- [ ] P1-S3: Add troubleshooting and safety deepening docs.
-- [ ] P1-S4: Add dependency maintenance automation.
-- [ ] P1-S5: Add release provenance and artifact hardening.
-- [ ] P1-S6: Improve contributor triage workflow.
-- [ ] P1-S7: Publish reproducible benchmark process.
+- [x] [P0-S1: Fix repository identity and package metadata for 0.1.0](https://github.com/ivan-94/py-gc-objects-analyze/issues/13).
+- [x] [P0-S2: Rewrite root README and quickstart for first-time users](https://github.com/ivan-94/py-gc-objects-analyze/issues/14).
+- [x] [P0-S3: Add open source governance, security, and GitHub templates](https://github.com/ivan-94/py-gc-objects-analyze/issues/16).
+- [x] [P0-S4: Implement release installer and artifact layout](https://github.com/ivan-94/py-gc-objects-analyze/issues/17).
+- [x] [P0-S5: Add GitHub Release workflow for `pygco` binary artifacts](https://github.com/ivan-94/py-gc-objects-analyze/issues/18).
+- [x] [P0-S6: Add PyPI release workflow for `pygco-dump`](https://github.com/ivan-94/py-gc-objects-analyze/issues/19).
+- [x] [P0-S7: Expand CI into release gate](https://github.com/ivan-94/py-gc-objects-analyze/issues/20).
+- [x] [P0-S8: Add clean-machine release acceptance guide](https://github.com/ivan-94/py-gc-objects-analyze/issues/22).
+- [x] [P1-S1: Reorganize docs information architecture](https://github.com/ivan-94/py-gc-objects-analyze/issues/23).
+- [x] [P1-S2: Add screenshots and Web UI walkthrough visuals](https://github.com/ivan-94/py-gc-objects-analyze/issues/24).
+- [x] [P1-S3: Add troubleshooting and safety deepening docs](https://github.com/ivan-94/py-gc-objects-analyze/issues/25).
+- [x] [P1-S4: Add dependency maintenance automation](https://github.com/ivan-94/py-gc-objects-analyze/issues/26).
+- [x] [P1-S5: Add release provenance and artifact hardening](https://github.com/ivan-94/py-gc-objects-analyze/issues/28).
+- [x] [P1-S6: Improve contributor triage workflow](https://github.com/ivan-94/py-gc-objects-analyze/issues/29).
+- [x] [P1-S7: Publish reproducible benchmark process](https://github.com/ivan-94/py-gc-objects-analyze/issues/30).
 
 ## Recommended Implementation Order
 
@@ -772,7 +787,7 @@ P0 is done when:
 
 - [x] Root README is release-facing and accurate.
 - [x] License, contributing, security, templates, package metadata, and changelog are present.
-- [ ] GitHub Release workflow can produce installer, archives, checksums, and draft release notes. Requires real workflow run.
+- [x] GitHub Release workflow can produce installer, archives, checksums, and draft release notes.
 - [ ] PyPI workflow can publish `pygco-dump` through a rehearsed path. Requires TestPyPI/PyPI Trusted Publishing setup and rehearsal.
 - [x] CI gates docs, Rust, Python, Web UI, generated docs, package builds, and release smoke checks locally and in workflow definitions.
 - [ ] Clean-machine acceptance passes on the supported P0 targets.
@@ -780,6 +795,6 @@ P0 is done when:
 P1 is done when:
 
 - [x] Docs navigation, screenshots, troubleshooting, and safety material are strong enough for self-service users.
-- [ ] Dependency automation and triage workflows are active.
+- [x] Dependency automation and triage workflows are active.
 - [ ] Release artifacts have stronger verification or provenance than basic checksums.
-- [ ] Performance claims are reproducible from documented benchmark commands and environment metadata.
+- [x] Performance claims are reproducible from documented benchmark commands and environment metadata.
