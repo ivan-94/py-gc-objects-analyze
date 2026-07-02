@@ -73,7 +73,7 @@
   - `main` is pushed to `ivan-94/py-gc-objects-analyze`.
   - GitHub Actions CI run `28582013621` passed on commit `9c38ba0`.
   - Pull request CI run `28582123395` passed on a Dependabot PR.
-  - After maintainer feedback, PR/push CI was simplified to lightweight docs/unit checks; release artifact, Web E2E, and benchmark checks stay in dedicated release/benchmark workflows.
+  - After maintainer feedback, PR/push CI was simplified to unit checks only; docs command, release artifact, Web E2E, and benchmark checks stay in local release preparation or dedicated release/benchmark workflows.
   - Manual benchmark workflow run `28581056797` passed.
   - GitHub Release workflow run `28582024816` passed for tag `v0.1.0-rc.2` and produced a draft release.
   - `gh release download v0.1.0-rc.2 --repo ivan-94/py-gc-objects-analyze --dir .scratch/rc2` downloaded `install.sh`, `checksums.txt`, three target archives, and their per-archive `.sha256` files.
@@ -449,11 +449,11 @@ Goal: keep ordinary PR feedback fast and unit-test oriented, while reserving rel
 Tasks:
 
 - [x] Keep PR/push CI lightweight:
-  - [x] `docs-light`: `python3 scripts/check_docs_commands.py`
   - [x] `rust-unit`: `cargo test --workspace`
   - [x] `python-unit`: `python -m pytest python/pygco_dump` on the default supported Python version
   - [x] `web-unit`: `pnpm --dir web/app test`
 - [x] Remove heavyweight PR/push CI checks:
+  - [x] docs command freshness check that requires a built `pygco`
   - [x] Rust clippy and release build
   - [x] generated CLI/OpenAPI freshness
   - [x] Web build and Playwright E2E
@@ -466,6 +466,7 @@ Tasks:
 Acceptance:
 
 - [x] PR CI does not install browser dependencies or run Playwright.
+- [x] PR CI only has Rust, Python, and Web unit jobs.
 - [x] PR CI does not build release artifacts.
 - [x] PR CI does not run benchmark smoke tests.
 - [x] Tag release workflow still fails if Web UI assets are missing or placeholder assets are embedded.
@@ -474,7 +475,6 @@ Verification:
 
 - [ ] First lightweight main or PR CI run after the simplification.
 - [x] Local lightweight equivalent:
-  - [x] `python3 scripts/check_docs_commands.py`
   - [x] `cargo test --workspace`
   - [x] `python -m pytest python/pygco_dump`
   - [x] `pnpm --dir web/app test`
