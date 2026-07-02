@@ -35,6 +35,16 @@ gh workflow run release-acceptance.yml -f tag=v0.1.0-rc.3
 
 The workflow downloads GitHub Release assets, verifies `checksums.txt`, installs through the release `install.sh`, and runs the fixture import, summary, objects, diff, report, and `open --no-browser` smoke commands on an Ubuntu runner. It is intentionally `workflow_dispatch` only and does not run on push or pull request CI.
 
+## Optional Release Workflow Dry Run
+
+Use the release workflow dry run when you want to exercise release builds and packaging without creating or modifying a GitHub Release:
+
+```bash
+gh workflow run release.yml -f tag=dry-run -f dry_run=true
+```
+
+The dry run still builds the Web UI, release binaries, archives, checksums, installer, and release notes. It skips only the final `gh release create` step.
+
 ## PyPI Trusted Publishing Setup
 
 Before HAT can check the TestPyPI/PyPI install path, configure a trusted publisher on the package index. Follow the official [PyPI Trusted Publishers guide](https://docs.pypi.org/trusted-publishers/) and use these claims from `.github/workflows/publish-python.yml`:

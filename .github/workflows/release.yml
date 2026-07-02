@@ -9,6 +9,11 @@ on:
       tag:
         description: "Existing tag to package, for example v0.1.0"
         required: true
+      dry_run:
+        description: "Build and package artifacts without creating a GitHub Release"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -146,6 +151,7 @@ jobs:
           (cd dist && sha256sum pygco-*.tar.gz > checksums.txt)
           python3 scripts/render_release_notes.py "${{ steps.release.outputs.version }}" > release-notes.md
       - name: Create draft GitHub Release
+        if: github.event_name != 'workflow_dispatch' || inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -154,3 +160,8 @@ jobs:
             --verify-tag \
             --title "${{ steps.release.outputs.tag }}" \
             --notes-file release-notes.md
+      - name: Dry-run summary
+        if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true
+        run: |
+          printf 'release dry run for %s\n' "${{ steps.release.outputs.tag }}"
+          ls -l dist release-notes.md
