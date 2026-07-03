@@ -16,7 +16,7 @@ Commands:
   sessions         Inspect cached analysis sessions created by `pygco open`
   summary          Show snapshot overview, top types/modules/cohorts, warnings, and findings
   overview         Compact leak triage entrypoint with quality, top cohorts, and next commands
-  objects          List objects with filters, sorting, pagination, and agent-friendly projections
+  objects          List objects with filters, sorting, pagination, and automation-friendly projections
   object           Show one object's metadata, metrics, direct edges, and next investigation commands
   edges            List direct referents or referrers for one object
   paths            Sample bounded owner/reference paths around an object
@@ -292,7 +292,7 @@ By default overview avoids heavy suspect queries and prints the next command to 
 ## `pygco objects`
 
 ```text
-List objects with filters, sorting, pagination, and agent-friendly projections
+List objects with filters, sorting, pagination, and automation-friendly projections
 
 Usage: pygco objects [OPTIONS] <DB>
 
@@ -330,7 +330,7 @@ Examples:
 Sort keys:
   reachable-size, shallow-size, in-edges, out-edges, object-id, type, module.
 
-Agent tip:
+Automation tip:
   Use --fields object_id,type,shallow_size,reachable_size,next_command to keep outputs compact.
 ```
 
@@ -709,7 +709,7 @@ Examples:
   pygco report analysis.sqlite --snapshot 1 --format markdown
   pygco report analysis.sqlite --format json
 
-Markdown reports are suitable for issue/PR/HAT artifacts.
+Markdown reports are suitable for issues, PRs, and release acceptance notes.
 ```
 
 ## `pygco doctor`

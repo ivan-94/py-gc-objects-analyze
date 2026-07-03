@@ -168,7 +168,7 @@ findings 是启发式线索，不是诊断结论。
 - `metrics`
 - `links`
 
-`links` 是 `{ label, href }` 数组，用于跳转到相关 Web UI/API 视图。结构化 report 必须暴露 `finding_evidence_schema`，供下游 Agent 和 UI 校验 evidence。
+`links` 是 `{ label, href }` 数组，用于跳转到相关 Web UI/API 视图。结构化 report 必须暴露 `finding_evidence_schema`，供下游工具和 UI 校验 evidence。
 
 第一版 `kind` 为封闭枚举：
 

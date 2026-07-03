@@ -1,15 +1,5 @@
 # Install And Build
 
-## Source Manifest
-
-- Root project overview: `README.md`
-- Open source release spec: `docs/specs/2026-07-02-open-source-release-readiness-spec.md`
-- CLI contract: `docs/cli.md`
-- Web build architecture: `docs/architecture.md`
-- Python package metadata: `python/pygco_dump/pyproject.toml`
-- Release scripts: `scripts/install.sh`, `scripts/package_release.sh`, `scripts/test_install.sh`
-- Release workflows: `.github/workflows/release.yml`, `.github/workflows/publish-python.yml`
-
 ## Install `pygco`
 
 The primary release install path downloads `install.sh` from the latest GitHub Release:

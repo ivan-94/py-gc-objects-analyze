@@ -129,7 +129,7 @@ benchmark 维度：
 - reachability compute time
 - Web API p95 latency
 
-Scheduled and manual benchmark runs are defined in `.github/workflows/benchmarks.yml`. Reports are uploaded as workflow artifacts instead of being committed by default.
+Manual benchmark runs are defined in `.github/workflows/benchmarks.yml`. Reports are uploaded as workflow artifacts instead of being committed by default. The benchmark workflow is intentionally `workflow_dispatch` only: it is not a PR gate and does not run on a schedule.
 
 Each published benchmark snapshot must name:
 

@@ -31,4 +31,4 @@ Minimum expected gates:
 
 ## Release Operations
 
-Use `docs/release-acceptance.md` for release candidate HAT and `docs/release-provenance.md` for artifact verification expectations.
+Use `docs/release-acceptance.md` for release candidate acceptance and `docs/release-provenance.md` for artifact verification expectations.

@@ -18,7 +18,6 @@ Install pygco
 - [Runtime safety](runtime-safety.md)
 - [Known limitations](known-limitations.md)
 - [Troubleshooting](troubleshooting.md)
-- [Release acceptance](release-acceptance.md)
 
 ## User Guide
 
@@ -44,31 +43,12 @@ Install pygco
 ## Developer Docs
 
 - [Architecture](architecture.md)
-- [Engineering standards](project/engineering-standards.md)
-- [Source Manifest guidance](project/source-manifest.md)
 - [Issue triage](triage.md)
 - [Good first issue candidates](good-first-issues.md)
 - [Maintenance](maintenance.md)
 - [Release provenance](release-provenance.md)
 - [Release acceptance](release-acceptance.md)
 - [References](references/README.md)
-
-## Specs And Project Archive
-
-Current specs:
-
-- [Open Source Release Readiness Spec](specs/2026-07-02-open-source-release-readiness-spec.md)
-- [CLI Leak Workflow Remediation Spec](specs/2026-07-02-cli-leak-workflow-remediation-spec.md)
-- [Cache Sessions Spec](specs/2026-07-01-cache-sessions-spec.md)
-
-Project/archive material:
-
-- [CLI diagnostics workbench](cli-diagnostics-workbench.md)
-- [CLI diagnostics technical spec](project/cli-diagnostics-technical-spec.md)
-- [Implementation blueprint](project/implementation-blueprint.md)
-- [POC migration guide](project/poc-migration-guide.md)
-- [POC retrospective](poc-retrospective.md)
-- [Release task list](project/task.md)
 
 ## First-Version Boundaries
 

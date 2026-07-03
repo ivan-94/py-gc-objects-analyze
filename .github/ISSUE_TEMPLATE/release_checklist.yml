@@ -1,5 +1,5 @@
 name: Release checklist
-description: Track a release candidate through artifact, PyPI, and HAT verification.
+description: Track a release candidate through artifact, PyPI, and release acceptance verification.
 title: "Release: v"
 labels: ["area:release", "priority:p0"]
 body:
@@ -11,16 +11,15 @@ body:
     validations:
       required: true
   - type: textarea
-    id: source_manifest
+    id: release_context
     attributes:
-      label: Source Manifest
-      description: List spec, changelog, release workflow run, PyPI workflow run, and HAT guide.
+      label: Release context
+      description: List changelog entry, release workflow run, PyPI workflow run, and acceptance guide.
       value: |
-        - Spec:
         - Changelog:
         - Release workflow:
         - PyPI workflow:
-        - HAT guide:
+        - Acceptance guide:
     validations:
       required: true
   - type: checkboxes
@@ -46,7 +45,7 @@ body:
     attributes:
       label: Acceptance
       options:
-        - label: Linux HAT passed.
-        - label: macOS HAT passed.
+        - label: Linux release acceptance passed.
+        - label: macOS release acceptance passed.
         - label: README, install docs, quickstart, security docs, and known limitations match observed behavior.
         - label: Release notes include artifacts, checksums, compatibility versions, and known limitations.

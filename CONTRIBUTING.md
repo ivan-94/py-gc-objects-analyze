@@ -35,11 +35,11 @@ python3 scripts/check_docs_commands.py
 ## Pull Request Expectations
 
 - Keep changes focused and explain the user-visible effect.
-- Update docs/specs before changing documented behavior.
+- Update docs before changing documented behavior.
 - Add or update tests for Rust, Python, Web UI, or release tooling changes.
 - Regenerate CLI/OpenAPI docs when CLI help or API schema changes.
 - Record compatibility impact for CLI JSON, dump format, SQLite schema, API, report output, and release artifacts.
-- Include a Source Manifest in durable artifacts such as PRDs, issues, HAT guides, PR bodies, and handoff docs.
+- Include enough context in issues and PRs for reviewers to re-run the relevant commands and inspect the source material.
 
 ## Test Matrix By Area
 
@@ -48,7 +48,7 @@ python3 scripts/check_docs_commands.py
 - Python producer: `python -m pytest python/pygco_dump`.
 - Web UI: `(cd web/app && corepack pnpm build)` and `(cd web/app && corepack pnpm test:e2e)`.
 - Docs contracts: `python3 scripts/check_docs_commands.py`.
-- Release tooling: installer tests, release archive smoke, and clean-machine HAT when release artifacts change.
+- Release tooling: installer tests, release archive smoke, and clean-machine release acceptance when release artifacts change.
 
 ## Handling Dumps
 

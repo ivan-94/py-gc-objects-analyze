@@ -1,6 +1,6 @@
 # CLI Reference
 
-本文是当前版本 `pygco` 命令行的用户参考。它只描述已经存在、可以运行的命令；规划中的诊断命令见 [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md) 和 [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)。
+本文是当前版本 `pygco` 命令行的用户参考。它只描述已经存在、可以运行的命令；未出现在本页或 generated help 中的命令不属于当前版本的 CLI contract。
 
 如果需要查看从二进制直接生成的 help 文本，见 [Generated CLI Help](generated/cli-help.md)。
 
@@ -95,7 +95,7 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 
 | 格式 | 适合场景 |
 | --- | --- |
-| `json` | 默认机器可读输出，适合脚本、Agent、API 对照 |
+| `json` | 默认机器可读输出，适合脚本、自动化工具、API 对照 |
 | `jsonl` | 行式输出，适合管道处理 |
 | `table` | 终端快速查看 |
 | `markdown` | 复制到报告、issue、PR 说明 |
@@ -105,7 +105,7 @@ pygco diff analysis.sqlite --from 1 --to 2 --format markdown
 - JSON/API 风格输出里的 object id 使用字符串，避免 JavaScript 大整数精度问题。
 - `--fields` 用于输出字段投影；字段名以该命令实际 JSON 输出为准。
 - `--verbose` 适合排查失败，会输出更多错误链路信息。
-- `--no-color` 适合日志、CI、Agent 解析。
+- `--no-color` 适合日志、CI、自动化解析。
 
 退出码：
 
@@ -262,7 +262,7 @@ pygco import before.jsonl.gz after.jsonl.gz -o analysis.sqlite --rebuild --profi
 - 默认计算 estimated reachable size；它是有界估算，不是精确 retained size。
 - `--no-reachability` 或 `--reachability-mode off` 会跳过 reachable 估算。
 - `--rules` 用来加载 cohort 规则，影响 cache/async/connection 等聚合分类。
-- `--progress` 只写 stderr，不污染 JSON stdout；`never` 适合脚本和 Agent，`always` 适合长任务观察。
+- `--progress` 只写 stderr，不污染 JSON stdout；`never` 适合脚本和自动化工具，`always` 适合长任务观察。
 - `--profile` 保留旧字段 `phase` / `elapsed_ms`，并增加 `wall_time_ms`、`self_time_ms`、`nested`、`snapshot_id`、`phase_kind`，避免把嵌套阶段简单相加后误读为总耗时。
 
 性能提示：
@@ -625,7 +625,7 @@ diff-growth
 说明：
 
 - `findings` 是“值得继续查”的线索，不是 confirmed leak。
-- JSON 输出包含 `evidence`、`links` 和 action，适合 Agent 或脚本继续下钻。
+- JSON 输出包含 `evidence`、`links` 和 action，适合脚本或自动化工具继续下钻。
 
 ## `pygco suspects`
 
@@ -1009,7 +1009,7 @@ pygco version
 - 还没有独立语义化 `explain` 命令；当前 `object`、`paths --annotate`、`container` 是事实展示加基础解释。
 - `paths --annotate` 能读出节点摘要，但路径仍是有界采样，不是完整所有者证明；当前 dump 也没有字段名、dict key、局部变量名。
 
-这些缺口的系统性整改见 [CLI 诊断工作台整改方案](cli-diagnostics-workbench.md) 和 [CLI 诊断工作台技术实施 Spec](project/cli-diagnostics-technical-spec.md)。
+这些缺口是当前版本边界，不代表已实现或稳定承诺。
 
 ## 当前版本调查 recipes
 

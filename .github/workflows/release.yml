@@ -111,7 +111,7 @@ jobs:
               "$binary" version
               "$binary" import fixtures/golden/tiny-v1.jsonl.gz -o "smoke-$target.sqlite" --rebuild
             else
-              echo "built cross-target $target on host $host; runtime smoke is covered by HAT"
+              echo "built cross-target $target on host $host; runtime smoke is covered by release acceptance"
             fi
             scripts/package_release.sh "${{ steps.version.outputs.version }}" "$target"
           done

@@ -1,31 +1,20 @@
 # Release Acceptance
 
-## Source Manifest
-
-- Release readiness spec: `docs/specs/2026-07-02-open-source-release-readiness-spec.md`
-- Install docs: `docs/install.md`
-- Quickstart: `docs/quickstart.md`
-- Runtime safety: `docs/runtime-safety.md`
-- Known limitations: `docs/known-limitations.md`
-- Release scripts: `scripts/install.sh`, `scripts/package_release.sh`
-- GitHub release workflow: `.github/workflows/release.yml`
-- PyPI publish workflow: `.github/workflows/publish-python.yml`
-
 ## Purpose
 
-Run this guide before publishing a non-draft 0.1.0 release. Record the release tag, artifact URLs, OS/architecture, Python version, commands, outputs, and screenshots or Chrome evidence when a browser is used.
+Run this guide before publishing a non-draft release. Record the release tag, artifact URLs, OS/architecture, Python version, commands, outputs, and any manual browser checks.
 
 ## External Preflight
 
-Before starting HAT, check external release prerequisites:
+Before starting acceptance, check external release prerequisites:
 
 ```bash
 scripts/release_preflight.sh
 ```
 
-The preflight is read-only. It checks local tools, `origin`, GitHub CLI authentication, visible GitHub releases and workflow runs, PyPI package visibility, and required local release files. Any warning should be resolved or recorded in the HAT evidence before publishing a non-draft release.
+The preflight is read-only. It checks local tools, `origin`, GitHub CLI authentication, visible GitHub releases and workflow runs, PyPI package visibility, and required local release files. Any warning should be resolved or recorded before publishing a non-draft release.
 
-## Optional Linux Runner HAT
+## Optional Linux Runner Acceptance
 
 When a local Linux machine is not available, run the manual `release-acceptance` workflow against a draft or published release tag:
 
@@ -53,26 +42,18 @@ gh run watch <run-id> --exit-status
 gh attestation verify "pygco-dry-run-attest-x86_64-unknown-linux-gnu.tar.gz" --repo ivan-94/py-gc-objects-analyze
 ```
 
-The 2026-07-02 attestation dry run `28587529503` passed on commit `a81fcdf` and verified the Linux archive against `release.yml@refs/heads/main`.
-
 ## PyPI Trusted Publishing Setup
 
-Before HAT can check the TestPyPI/PyPI install path, configure a trusted publisher on the package index. Follow the official [PyPI Trusted Publishers guide](https://docs.pypi.org/trusted-publishers/) and use these claims from `.github/workflows/publish-python.yml`:
+Before release acceptance can check the TestPyPI/PyPI install path, configure a trusted publisher on the package index. Follow the official [PyPI Trusted Publishers guide](https://docs.pypi.org/trusted-publishers/) and use these claims from `.github/workflows/publish-python.yml`:
 
 | Index | Project | Owner | Repository | Workflow | Environment |
 | --- | --- | --- | --- | --- | --- |
 | TestPyPI | `pygco-dump` | `ivan-94` | `py-gc-objects-analyze` | `publish-python.yml` | `testpypi` |
 | PyPI | `pygco-dump` | `ivan-94` | `py-gc-objects-analyze` | `publish-python.yml` | `pypi` |
 
-The 2026-07-02 TestPyPI rehearsal run `28586504894` built the wheel and sdist successfully, passed `twine check`, and tested the built wheel. The upload failed with `invalid-publisher` for `repo:ivan-94/py-gc-objects-analyze:environment:testpypi`, which means the matching TestPyPI trusted publisher was not configured yet.
-
-Retry run `28589579759` produced the same result: build, `twine check`, built-wheel smoke, and artifact upload passed; TestPyPI still rejected the trusted publishing exchange with `invalid-publisher` for repository `ivan-94/py-gc-objects-analyze`, workflow `publish-python.yml@refs/heads/main`, and environment `testpypi`.
-
-After configuring the TestPyPI pending trusted publisher, run `28592147240` published `pygco-dump 0.1.0` to TestPyPI successfully. The production PyPI publisher is still a separate maintainer setup step before the non-draft release.
-
 `publish-python.yml` is intentionally `workflow_dispatch` only. Publish `pygco-dump` to PyPI explicitly before making the GitHub Release public; publishing a GitHub Release should not retry a package version that already exists on PyPI.
 
-Production PyPI run `28596078256` published `pygco-dump 0.1.0` successfully. `python -m pip install "pygco-dump[fastapi]"` passed in a clean virtual environment after the publish.
+After publishing, verify `python -m pip install "pygco-dump[fastapi]"` in a clean virtual environment.
 
 For TestPyPI install rehearsals, install runtime dependencies from PyPI first, then install the TestPyPI wheel with `--no-deps`:
 
@@ -83,7 +64,7 @@ python -m pip install --index-url https://test.pypi.org/simple/ --no-deps 'pygco
 
 Avoid using TestPyPI together with `--extra-index-url` for acceptance evidence; unrelated packages on TestPyPI can win dependency resolution before pip falls back to PyPI.
 
-## HAT Checklist
+## Acceptance Checklist
 
 - [ ] Install `pygco` through the release installer on Linux.
 - [ ] Install `pygco` through the release installer on macOS.
@@ -114,20 +95,18 @@ Avoid using TestPyPI together with `--extra-index-url` for acceptance evidence; 
 ## Evidence Template
 
 ```markdown
-## Source Manifest
-
-### Sources
+## Release Evidence
 
 - Release tag:
 - GitHub Release URL:
 - PyPI/TestPyPI URL:
 - Machine:
 - Python:
-- Browser/Chrome evidence:
+- Browser evidence:
 
 ### Produced artifacts
 
-- HAT log:
+- Acceptance log:
 - Screenshots:
 
 ### Key decisions

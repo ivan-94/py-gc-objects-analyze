@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Draft or published release tag to validate, for example v0.1.0-rc.3"
+        description: "Draft or published release tag to validate, for example v0.1.0"
         required: true
 
 permissions:
   contents: write
 
 jobs:
-  linux-installer-hat:
-    name: linux installer HAT
+  linux-installer-acceptance:
+    name: linux installer acceptance
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

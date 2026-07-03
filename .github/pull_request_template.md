@@ -2,25 +2,13 @@
 
 -
 
-## Source Manifest
+## Context
 
-### Sources
-
--
-
-### Produced artifacts
-
--
-
-### Key decisions
-
--
-
-### Verification evidence
-
--
-
-### Open questions / risks
+- Related issue/docs:
+- User-visible behavior:
+- Compatibility impact:
+- Verification evidence:
+- Open questions or risks:
 
 -
 

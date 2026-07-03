@@ -160,7 +160,7 @@ By default overview avoids heavy suspect queries and prints the next command to 
     )]
     Overview(OverviewArgs),
     #[command(
-        about = "List objects with filters, sorting, pagination, and agent-friendly projections",
+        about = "List objects with filters, sorting, pagination, and automation-friendly projections",
         after_help = r#"Examples:
   pygco objects analysis.sqlite --sort reachable-size --limit 20 --format table
   pygco objects analysis.sqlite --type dict --min-reachable-size 1mb --format json
@@ -169,7 +169,7 @@ By default overview avoids heavy suspect queries and prints the next command to 
 Sort keys:
   reachable-size, shallow-size, in-edges, out-edges, object-id, type, module.
 
-Agent tip:
+Automation tip:
   Use --fields object_id,type,shallow_size,reachable_size,next_command to keep outputs compact."#
     )]
     Objects(ObjectsArgs),
@@ -290,7 +290,7 @@ Use DOT for graph visualization and JSON for agent-side post-processing."#
   pygco report analysis.sqlite --snapshot 1 --format markdown
   pygco report analysis.sqlite --format json
 
-Markdown reports are suitable for issue/PR/HAT artifacts."#
+Markdown reports are suitable for issues, PRs, and release acceptance notes."#
     )]
     Report(DbArgs),
     #[command(

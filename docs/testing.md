@@ -2,6 +2,19 @@
 
 `pygco` 必须用测试保证 dump 兼容、导入正确、分析语义稳定、Web UI 可用。
 
+## GitHub Actions 策略
+
+日常 PR 检查保持轻量，只跑 Rust、Python 和 Web 单元测试。
+
+触发规则：
+
+- `pull_request`：跑轻量单元 CI。
+- `push` 到 `main`：跑轻量单元 CI。
+- 其他分支的 `push`：不单独跑 CI，避免和 PR check 重复。
+- `workflow_dispatch`：允许维护者手动重跑轻量 CI。
+- `benchmarks`：只通过 `workflow_dispatch` 手动运行，不作为 PR gate，也不定时运行。
+- `release`、`release-acceptance`、`publish-python`：只在 tag 或手动发布/验收流程中运行。
+
 ## Golden Dumps
 
 维护一组固定 dump：
@@ -99,7 +112,7 @@ expected/
 
 ## Benchmark Tests
 
-CI 可以跑小型 benchmark。大型 benchmark 手动或 nightly 跑。
+Benchmark 用于发布前或性能调查时的人工观测，不作为日常 PR gate，也不定时运行。当前 GitHub Actions benchmark workflow 只保留 `workflow_dispatch` 手动触发。
 
 必须记录：
 
@@ -107,4 +120,3 @@ CI 可以跑小型 benchmark。大型 benchmark 手动或 nightly 跑。
 - query latency。
 - Web API latency。
 - bundle size。
-
