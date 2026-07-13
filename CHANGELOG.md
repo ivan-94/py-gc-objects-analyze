@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.1.0 - Unreleased
+## 0.1.1 - Unreleased
+
+Fixes:
+
+- `pygco-dump` freezes its main object census before creating streaming serializer state, excludes producer-owned
+  snapshot containers from dumps, and avoids the O(N) object-id index when referent stubs are disabled.
+- The object graph UI supports filtering visible graph nodes by type and text, with matching end-to-end coverage.
+
+## 0.1.0
 
 Initial local Python GC object memory forensics release.
 

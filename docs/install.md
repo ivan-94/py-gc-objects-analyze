@@ -25,7 +25,7 @@ curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/latest/down
 Install a specific version by downloading that version's installer:
 
 ```bash
-curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/download/v0.1.0/install.sh | sh
+curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/download/v0.1.1/install.sh | sh
 ```
 
 ## Manual Binary Install
@@ -33,7 +33,7 @@ curl -fsSL https://github.com/ivan-94/py-gc-objects-analyze/releases/download/v0
 Manual install is recommended when you do not allow `curl | sh`:
 
 ```bash
-version=0.1.0
+version=0.1.1
 target=x86_64-unknown-linux-gnu
 base="https://github.com/ivan-94/py-gc-objects-analyze/releases/download/v${version}"
 

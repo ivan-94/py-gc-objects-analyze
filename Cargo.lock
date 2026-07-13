@@ -1087,7 +1087,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-analysis"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "pygco-store",
@@ -1100,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1122,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-cli"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1147,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-dump-format"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flate2",
  "serde",
@@ -1157,7 +1157,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-importer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "flate2",
@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-report"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pygco-analysis",
  "rusqlite",
@@ -1184,7 +1184,7 @@ dependencies = [
 
 [[package]]
 name = "pygco-store"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "rusqlite",

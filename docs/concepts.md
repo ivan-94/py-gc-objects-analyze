@@ -4,6 +4,13 @@
 
 GC object dump 是从 Python 运行时导出的对象快照。它以 `gc.get_objects()` 为主集合，记录每个对象的 id、type、module、浅层 size，以及可选 referents。
 
+producer 在调用 `iter_gc_dump_records()` 时冻结主集合，然后才创建流式序列化状态。快照 list、
+对象 id 成员索引、序列化 generator 和 gzip/JSON 临时对象属于采样开销，不属于被分析的业务
+对象，不应出现在主集合、stub 或 referent edge 中。
+
+主集合冻结不等于原子 heap graph：referents 在后续流式序列化期间逐个读取，业务线程仍可能
+修改对象关系。因此对象 census 的时点比引用边更严格，引用图应视为 best-effort 取证视图。
+
 它不是完整 RSS 快照。以下内存通常不在 GC object census 中：
 
 - native allocations
@@ -37,6 +44,10 @@ dump 文件只记录从对象到 referent 的边。referrer 是本地导入 SQLi
 有些 referent 不在 `gc.get_objects()` 主集合中，但可以通过 `gc.get_referents(obj)` 看到。Python producer 可以为这些对象输出轻量 stub。
 
 stub 只表示“这个 referent 在 dump 时存在，并被某个对象引用过”。它不保证具备完整 referents，也不保证能代表完整对象图。
+
+只有同时启用 referents 和 referent stubs 时，producer 才需要构造 O(N) 的主对象 id 成员索引。
+关闭 stub 允许引用边指向 missing object，并避免这份大索引；关闭 referents 则适合低开销趋势
+快照。
 
 ## Shallow Size
 

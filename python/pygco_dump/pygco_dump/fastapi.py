@@ -24,14 +24,14 @@ def gc_heap_dump_route() -> Callable[..., object]:
         include_repr: bool = Query(default=False),
         repr_limit: int = Query(default=0, ge=0, le=500),
     ) -> StreamingResponse:
-        records = iter_gc_dump_records(
-            collect=collect,
-            include_referents=include_referents,
-            include_referent_stubs=include_referent_stubs,
-            include_repr=include_repr,
-            repr_limit=repr_limit,
-        )
         try:
+            records = iter_gc_dump_records(
+                collect=collect,
+                include_referents=include_referents,
+                include_referent_stubs=include_referent_stubs,
+                include_repr=include_repr,
+                repr_limit=repr_limit,
+            )
             first = next(records)
         except DumpInProgressError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc

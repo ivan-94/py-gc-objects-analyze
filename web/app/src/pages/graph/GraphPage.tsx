@@ -13,6 +13,7 @@ import { Page, PageTitle } from "@/components/shared/page";
 import { apiClient, type ObjectRow } from "@/generated/api-client";
 import { exportJson } from "@/lib/export";
 import { formatBytes, formatNumber } from "@/lib/format";
+import { pruneGraphToRoot } from "@/lib/graph-filter";
 import { cn } from "@/lib/utils";
 import { valueOrUndefined, type UpdateSearch } from "@/lib/search";
 
@@ -56,13 +57,14 @@ const DEFAULT_GRAPH_SETTINGS: GraphSettings = {
   repel: 16500,
   gravity: 0.08,
   linkWidth: 0.62,
-  showArrows: false,
+  showArrows: true,
   animate: true,
   hiddenLegendKeys: [],
   controlsCollapsed: false
 };
 
 const GRAPH_SETTINGS_STORAGE_KEY = "pygco.graph.settings.v1";
+const GRAPH_SETTINGS_STORAGE_VERSION = 2;
 
 const NODE_SEMANTICS: Record<NodeSemanticKey, NodeSemantic> = {
   root: { key: "root", label: "root", color: "#a78bfa", ringColor: "rgb(196 181 253 / 0.7)", rank: 0 },
@@ -136,9 +138,16 @@ export function GraphPage({ snapshotId, root, depth, nodeLimit, direction, updat
       <PageTitle
         title="Object Graph"
         meta="Local reference graph"
-        actions={graph.data?.truncated ? <Badge tone="warn">truncated</Badge> : null}
+        actions={
+          graph.data?.truncated || selectedNode ? (
+            <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto sm:flex-nowrap">
+              {selectedNode ? <GraphNodeCard root={root} selectedNode={selectedNode} updateSearch={updateSearch} /> : null}
+              {graph.data?.truncated ? <Badge className="order-first sm:order-last" tone="warn">truncated</Badge> : null}
+            </div>
+          ) : null
+        }
       />
-      <div className="relative min-h-[720px] overflow-hidden rounded-lg border border-slate-800 bg-[#111318] shadow-sm">
+      <div data-testid="graph-surface" className="relative min-h-[720px] overflow-hidden rounded-lg border border-slate-800 bg-[#111318] shadow-sm">
         <GraphCanvas
           nodes={visibleGraph.nodes}
           edges={visibleGraph.edges}
@@ -168,7 +177,6 @@ export function GraphPage({ snapshotId, root, depth, nodeLimit, direction, updat
           hiddenKeys={hiddenLegendKeys}
           onToggle={toggleLegendKey}
         />
-        {selectedNode ? <GraphNodeCard root={root} selectedNode={selectedNode} updateSearch={updateSearch} /> : null}
       </div>
       {graph.error ? <ErrorState error={graph.error} /> : null}
     </Page>
@@ -225,10 +233,13 @@ function GraphCanvas({
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || !selectedNodeId) return;
-    cy.nodes().unselect();
+    cy.elements().unselect();
     const selected = cy.$id(selectedNodeId);
-    if (selected.length > 0) selected.select();
-  }, [selectedNodeId]);
+    if (selected.length > 0) {
+      selected.select();
+      selected.connectedEdges().select();
+    }
+  }, [elements, layoutNonce, selectedNodeId]);
 
   return <div ref={containerRef} className="h-full min-h-[720px] w-full" />;
 }
@@ -483,15 +494,15 @@ function LegendButton({ item, hidden, onToggle }: { item: LegendItem; hidden: bo
 function GraphNodeCard({ root, selectedNode, updateSearch }: { root: string; selectedNode: ObjectRow; updateSearch: UpdateSearch }) {
   const isRoot = selectedNode.object_id === root;
   return (
-    <div className="pointer-events-auto absolute bottom-16 left-4 right-4 z-10 rounded-lg border border-white/10 bg-slate-950/86 p-3 text-slate-100 shadow-2xl backdrop-blur sm:bottom-4 sm:left-auto sm:w-[360px]">
-      <div className="min-w-0">
-        <div className="truncate text-sm font-semibold">{nodeLabel(selectedNode)}</div>
+    <section data-testid="graph-node-details" className="w-full max-w-[44rem] self-end border-t border-slate-200 pt-3 text-slate-900 sm:flex sm:h-[76px] sm:w-[44rem] sm:items-center sm:gap-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+      <div className="min-w-0 sm:w-52 sm:shrink-0">
+        <div className="truncate text-sm font-semibold text-slate-900">{nodeLabel(selectedNode)}</div>
         <button
           className={cn(
             "mt-1 block max-w-full break-all rounded-sm text-left font-mono text-[11px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
             isRoot
               ? "cursor-default text-slate-500"
-              : "text-violet-300 underline decoration-violet-400/50 underline-offset-2 hover:text-violet-100"
+              : "text-violet-700 underline decoration-violet-400/50 underline-offset-2 hover:text-violet-950"
           )}
           disabled={isRoot}
           title={isRoot ? "Current root object" : "Set as root object"}
@@ -501,21 +512,21 @@ function GraphNodeCard({ root, selectedNode, updateSearch }: { root: string; sel
         </button>
         <div className="mt-1 truncate text-xs text-slate-400">{selectedNode.module}</div>
       </div>
-      <div className="mt-3 grid grid-cols-4 gap-2">
+      <div className="mt-3 grid grid-cols-4 gap-2 sm:mt-0 sm:min-w-0 sm:flex-1">
         <Metric label="shallow" value={formatBytes(selectedNode.shallow_size)} />
         <Metric label="reachable" value={formatBytes(selectedNode.estimated_reachable_size)} />
         <Metric label="in" value={formatNumber(selectedNode.in_edges)} />
         <Metric label="out" value={formatNumber(selectedNode.out_edges)} />
       </div>
-    </div>
+    </section>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-md bg-white/[0.04] px-2 py-1.5">
+    <div className="min-w-0 border-l border-slate-200 pl-2 first:border-l-0 first:pl-0">
       <div className="truncate text-[10px] uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="truncate text-xs font-semibold tabular-nums text-slate-100">{value}</div>
+      <div className="truncate text-xs font-semibold tabular-nums text-slate-800">{value}</div>
     </div>
   );
 }
@@ -524,11 +535,13 @@ function filterGraphData(nodes: ObjectRow[], edges: GraphEdge[], missingEdges: G
   const visibleNodes = nodes.filter((node) => isNodeVisible(node, root, hiddenKeys));
   const visibleIds = new Set(visibleNodes.map((node) => node.object_id));
   const showReferences = !hiddenKeys.has("reference");
-  return {
-    nodes: visibleNodes,
-    edges: showReferences ? edges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)) : [],
-    missingEdges: showReferences ? missingEdges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)) : []
-  };
+  if (!showReferences) return { nodes: visibleNodes, edges: [], missingEdges: [] };
+  return pruneGraphToRoot(
+    visibleNodes,
+    edges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)),
+    missingEdges.filter((edge) => visibleIds.has(edge.from_id) && visibleIds.has(edge.to_id)),
+    root
+  );
 }
 
 function isNodeVisible(node: ObjectRow, root: string, hiddenKeys: Set<string>) {
@@ -649,8 +662,9 @@ function graphStyles(settings: GraphRenderSettings): StylesheetJson {
         opacity: 0.18
       }
     },
-    { selector: "edge:selected", style: { opacity: 0.9, width: Math.max(settings.linkWidth * 1.8, 1.4), "line-color": "#c4b5fd" } },
-    { selector: "edge.missing", style: { "line-color": "#f97316", "line-style": "dashed", "target-arrow-color": "#fb923c", opacity: 0.55 } }
+    { selector: "edge:selected", style: { opacity: 0.9, width: Math.max(settings.linkWidth * 1.8, 1.4), "line-color": "#c4b5fd", "target-arrow-color": "#c4b5fd" } },
+    { selector: "edge.missing", style: { "line-color": "#f97316", "line-style": "dashed", "target-arrow-color": "#fb923c", opacity: 0.55 } },
+    { selector: "edge.missing:selected", style: { opacity: 0.95, width: Math.max(settings.linkWidth * 1.8, 1.4), "line-color": "#fdba74", "target-arrow-color": "#fdba74" } }
   ];
 }
 
@@ -805,7 +819,8 @@ function loadGraphSettings(): GraphSettings {
     const parsed: unknown = JSON.parse(raw);
     if (!isRecord(parsed)) return DEFAULT_GRAPH_SETTINGS;
     const settings = isRecord(parsed.settings) ? parsed.settings : parsed;
-    return normalizeGraphSettings(settings);
+    const normalized = normalizeGraphSettings(settings);
+    return parsed.version === GRAPH_SETTINGS_STORAGE_VERSION ? normalized : { ...normalized, showArrows: DEFAULT_GRAPH_SETTINGS.showArrows };
   } catch {
     return DEFAULT_GRAPH_SETTINGS;
   }
@@ -814,7 +829,7 @@ function loadGraphSettings(): GraphSettings {
 function saveGraphSettings(settings: GraphSettings) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(GRAPH_SETTINGS_STORAGE_KEY, JSON.stringify({ settings }));
+    window.localStorage.setItem(GRAPH_SETTINGS_STORAGE_KEY, JSON.stringify({ version: GRAPH_SETTINGS_STORAGE_VERSION, settings }));
   } catch {
     // Ignore storage quota/private mode failures; graph controls still work for the current session.
   }

@@ -17,6 +17,11 @@
 
 ## Performance Boundaries
 
+- `pygco-dump` 是进程内观测器，无法做到零开销。主集合快照至少需要 O(N) 强引用；完整 referent
+  stub 模式还需要 O(N) 的 object-id 成员索引。producer 自身的这些对象会从 dump 结果中隔离，
+  但它们在采样期间仍占用目标进程内存。
+- `include_referents=false` 和 `include_referent_stubs=false` 不构造 object-id 成员索引，适合趋势
+  采样；完整引用图应避开延迟敏感时段，并在真实工作负载上验证峰值内存。
 - The first version is designed around local workstation analysis. Very large dumps may require tuning reachability limits or using `--no-reachability` during import.
 - Web UI tables are paginated or virtualized; exporting or viewing an entire object graph in the browser is intentionally unsupported.
 - Benchmark targets are measured against synthetic fixtures and should be rechecked on real workloads before relying on them for capacity planning.

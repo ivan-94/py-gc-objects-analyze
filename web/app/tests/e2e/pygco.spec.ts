@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test("overview, objects, graph, diff, sql, and report load against local API", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem("pygco.graph.settings.v1", JSON.stringify({ settings: { showArrows: false } }));
+  });
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
   await expect(page.getByText("Objects").first()).toBeVisible();
@@ -54,6 +57,28 @@ test("overview, objects, graph, diff, sql, and report load against local API", a
   await expect(page.getByText(/edges/).first()).toBeVisible();
   await expect(page.getByText("Graph controls")).toBeVisible();
   await expect(page.getByText("reference").first()).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "Arrows" })).toBeChecked();
+  const graphSurface = page.getByTestId("graph-surface");
+  const nodeDetails = page.getByTestId("graph-node-details");
+  await expect(nodeDetails).toBeVisible();
+  const [surfaceBox, detailsBox] = await Promise.all([graphSurface.boundingBox(), nodeDetails.boundingBox()]);
+  expect(surfaceBox).not.toBeNull();
+  expect(detailsBox).not.toBeNull();
+  expect(detailsBox!.y + detailsBox!.height).toBeLessThanOrEqual(surfaceBox!.y);
+  expect(detailsBox!.height).toBeLessThanOrEqual(96);
+  await expect(nodeDetails).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [mobileSurfaceBox, mobileDetailsBox, scrollWidth] = await Promise.all([
+    graphSurface.boundingBox(),
+    nodeDetails.boundingBox(),
+    page.evaluate(() => document.documentElement.scrollWidth)
+  ]);
+  expect(mobileSurfaceBox).not.toBeNull();
+  expect(mobileDetailsBox).not.toBeNull();
+  expect(mobileDetailsBox!.y + mobileDetailsBox!.height).toBeLessThanOrEqual(mobileSurfaceBox!.y);
+  expect(scrollWidth).toBeLessThanOrEqual(390);
+  await page.setViewportSize({ width: 1280, height: 720 });
 
   await page.goto("/?page=graph&snapshot=3&root=10");
   await expect(page.getByRole("button", { name: /stub/ }).first()).toBeVisible();

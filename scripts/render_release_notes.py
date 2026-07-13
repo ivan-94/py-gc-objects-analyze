@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 
 def render_release_notes(changelog: Path, version: str) -> str:
     text = changelog.read_text(encoding="utf-8")
-    text = text.replace("## 0.1.0 - Unreleased", f"## {version}", 1)
-    text = text.replace("pygco-0.1.0-", f"pygco-{version}-")
-    return text
+    match = re.search(r"^## \d+\.\d+\.\d+ - Unreleased$", text, re.MULTILINE)
+    if match is None:
+        raise ValueError("CHANGELOG.md must start its pending release with a '## X.Y.Z - Unreleased' heading")
+
+    next_heading = re.search(r"^## ", text[match.end() :], re.MULTILINE)
+    end = match.end() + next_heading.start() if next_heading else len(text)
+    return f"{text[:match.start()]}## {version}{text[match.end():end]}"
 
 
 def main() -> None:

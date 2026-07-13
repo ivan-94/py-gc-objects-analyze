@@ -6,6 +6,7 @@ import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from pygco_dump import iter_gc_dump_records
 from pygco_dump.fastapi import gc_heap_dump_route
 
 
@@ -22,3 +23,17 @@ def test_fastapi_route_downloads_gzip_jsonl() -> None:
     records = [json.loads(line) for line in payload.splitlines()]
     assert records[0]["format"] == "pygco-dump-jsonl"
     assert records[-1]["phase"] == "end"
+
+
+def test_fastapi_route_rejects_concurrent_dump() -> None:
+    app = FastAPI()
+    app.add_api_route("/debug/gc-heap-dump", gc_heap_dump_route(), methods=["GET"])
+    active_dump = iter_gc_dump_records(objects=[])
+
+    try:
+        response = TestClient(app).get("/debug/gc-heap-dump")
+    finally:
+        active_dump.close()  # type: ignore[attr-defined]
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "GC object dump is already running in this process"

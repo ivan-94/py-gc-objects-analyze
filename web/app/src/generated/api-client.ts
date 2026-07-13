@@ -31,6 +31,15 @@ export type CohortRow = {
   rules_version: string;
 };
 
+export type ContainerParams = {
+  snapshot_id?: number;
+  top_items?: boolean;
+  item_types?: boolean;
+  limit?: number;
+};
+
+export type ContainerResponse = Record<string, unknown>;
+
 export type DiffObjectRow = {
   object_id: string;
   type: string;
@@ -183,6 +192,7 @@ export type ObjectPathsParams = {
   fanout_limit?: number;
   limit?: number;
   include_core?: boolean;
+  annotate?: boolean;
 };
 
 export type ObjectPathsResponse = {
@@ -203,6 +213,14 @@ export type ObjectRow = {
 };
 
 export type OpenApiDocument = Record<string, unknown>;
+
+export type OverviewParams = {
+  snapshot_id?: number;
+  limit?: number;
+  with_suspects?: boolean;
+};
+
+export type OverviewResponse = Record<string, unknown>;
 
 export type ReachabilityRecomputeRequest = {
   snapshot_id?: number;
@@ -296,6 +314,18 @@ export type Summary = {
   import_warnings: unknown[];
 };
 
+export type SuspectsParams = {
+  snapshot_id?: number;
+  kind?: string;
+  min_reachable_size?: number;
+  non_builtin?: boolean;
+  include_stub?: boolean;
+  limit?: number;
+  offset?: number;
+};
+
+export type SuspectsResponse = Record<string, unknown>;
+
 export class PygcoApiError extends Error {
   code: string;
   details: Record<string, unknown>;
@@ -325,6 +355,10 @@ export class PygcoApiClient {
 
   cohorts(params?: AggregateParams): Promise<CohortRow[]> {
     return this.requestData<CohortRow[]>(withQuery("/api/cohorts", params));
+  }
+
+  container(objectId: string, params?: ContainerParams): Promise<ContainerResponse> {
+    return this.requestData<ContainerResponse>(withQuery("/api/objects/{object_id}/container".replace("{object_id}", encodeURIComponent(String(objectId))), params));
   }
 
   diff(params: DiffParams): Promise<DiffSummary> {
@@ -375,6 +409,10 @@ export class PygcoApiClient {
     return this.requestData<OpenApiDocument>("/api/openapi.json");
   }
 
+  overview(params?: OverviewParams): Promise<OverviewResponse> {
+    return this.requestData<OverviewResponse>(withQuery("/api/overview", params));
+  }
+
   recomputeReachability(body: ReachabilityRecomputeRequest): Promise<JobData> {
     return this.requestData<JobData>("/api/reachability/recompute", { method: "POST", body: JSON.stringify(body) });
   }
@@ -421,6 +459,10 @@ export class PygcoApiClient {
 
   summary(params?: SnapshotOnlyParams): Promise<Summary> {
     return this.requestData<Summary>(withQuery("/api/summary", params));
+  }
+
+  suspects(params?: SuspectsParams): Promise<SuspectsResponse> {
+    return this.requestData<SuspectsResponse>(withQuery("/api/suspects", params));
   }
 
   types(params?: AggregateParams): Promise<StatRow[]> {

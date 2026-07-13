@@ -188,6 +188,10 @@ Object id lifecycle is strongest for consecutive dumps from the same process.
 - 支持按 type/module 聚合视图。
 - 支持 focus node。
 - 支持 expand selected node。
+- 选中对象详情必须位于页面标题区右上角、图谱画布外；桌面端与左侧标题区等高，使用透明浅色信息行而非深色卡片，指标横向排列；窄屏时可换行到标题下方，不能遮挡节点或引用边。
+- 默认显示引用方向箭头；用户可在图谱控制面板中关闭。
+- 选中节点时，必须高亮其所有直接入边和出边。
+- 按图例过滤节点后，必须同时移除与根节点断开的孤儿节点及其引用边。
 
 禁止：
 

@@ -7,7 +7,7 @@
 The CLI and Python package use semantic versions:
 
 ```text
-0.1.0
+0.1.1
 ```
 
 Before 1.0, minor releases may still adjust behavior, but user-visible breaking changes must be called out in `CHANGELOG.md`.
@@ -40,7 +40,7 @@ Rules:
 
 Reachability and findings/report algorithms store explicit versions. When a scoring or interpretation algorithm changes, update the relevant version and changelog entry.
 
-Current versions for 0.1.0:
+Current versions for 0.1.1:
 
 - Dump format: `pygco-dump-jsonl` v1.
 - SQLite schema: v1.

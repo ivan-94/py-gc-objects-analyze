@@ -103,6 +103,14 @@ Implementation contract: this document is the first-version contract between `py
 
 `gc_stats` 的语义为 Python `gc.get_stats()` 返回值。由于 Python 版本间可能变化，第一版允许为 `null`，importer 不应依赖它。
 
+`object_count` 的主集合在调用 `iter_gc_dump_records()` 时立即冻结，而不是在消费返回的
+iterator 时延迟获取。producer 必须先完成主集合快照，再创建负责逐条序列化的 generator、
+JSON record 和 gzip 缓冲区。仅由 producer 持有的快照容器、成员索引和临时序列化对象不得
+作为主对象、referent stub 或 referent edge 写入 dump。
+
+这个边界只冻结主集合成员关系。producer 后续逐个调用 `gc.get_referents()` 时读取的是对象的
+实时直接引用，因此引用图仍是 best-effort 视图，而不是 stop-the-world 的原子 heap graph。
+
 ## Object Record
 
 示例：
@@ -213,11 +221,13 @@ stub 表示：
 Python producer 必须：
 
 - 流式 gzip 输出。
+- 在创建流式序列化 generator 之前冻结主对象集合，并隔离 producer 自身的临时采样状态。
 - 支持 `collect=false` 默认值。
 - 同一进程同时只允许一个 dump 在运行。
 - 不在 dump 过程中做聚合分析。
 - 不递归计算深层 size。
 - 默认不输出 `repr`。
+- 仅在 `include_referents=true` 且 `include_referent_stubs=true` 时构造主对象 id 成员索引。
 - 进程启动时生成稳定的 `producer_run_id`。
 - 同一进程内为每次 dump 递增 `dump_sequence`。
 
