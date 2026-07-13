@@ -45,6 +45,22 @@ Install the Python dump producer in the Python environment that runs your servic
 python -m pip install "pygco-dump[fastapi]"
 ```
 
+### Install The Agent Skill
+
+Optionally install the repository's `pygco` skill so supported coding agents can discover the CLI capabilities, dump integration, and analysis semantics:
+
+```bash
+npx skills add ivan-94/py-gc-objects-analyze --skill pygco
+```
+
+The default installation is project-local. To install it globally for Codex:
+
+```bash
+npx skills add ivan-94/py-gc-objects-analyze --skill pygco --agent codex --global
+```
+
+`npx skills` requires Node.js/npm but does not require a separate global CLI installation. The skill complements the `pygco` binary and `pygco-dump` producer; install those separately as shown above.
+
 Manual install, source builds, upgrade, uninstall, and release verification are covered in [docs/install.md](docs/install.md).
 
 ## First Analysis

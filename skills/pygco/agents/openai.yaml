@@ -1,0 +1,4 @@
+interface:
+  display_name: "pygco"
+  short_description: "使用 pygco CLI 分析 Python GC 对象转储"
+  default_prompt: "Use $pygco to explain pygco capabilities and prerequisites or analyze a Python GC object dump."
